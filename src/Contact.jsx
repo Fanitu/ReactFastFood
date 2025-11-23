@@ -44,13 +44,14 @@ const Contact = ({t,setContactForm,contactForm}) => {
             <div className="form-group">
               <label htmlFor="message">{t.message}</label>
               <textarea
-                id="message"
-                name="message"
-                rows="5"
-                value={contactForm.message}
-                onChange={handleContactChange}
-                required
-              ></textarea>
+                    id="message"
+                    name="message"
+                    rows="5"
+                    value={contactForm.message}
+                    onChange={handleContactChange}
+                    required
+                   >
+              </textarea>
             </div>
             <button type="submit" className="submit-btn">
               {t.sendMessage}
