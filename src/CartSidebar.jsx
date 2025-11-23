@@ -1,6 +1,6 @@
 import React from 'react'
 
-const CartSidebar = ({cartItems,isCartOpen,setIsCartOpen,t,setCartItems}) => {
+const CartSidebar = ({cartItems,isCartOpen,setIsCartOpen,t,setCartItems,cartTotal}) => {
     const removeFromCart = (id) => {
     setCartItems(prev => prev.filter(item => item.id !== id));
   };

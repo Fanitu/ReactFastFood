@@ -1,6 +1,6 @@
 import React from 'react'
 
-const Menu = ({products,activeCategory,t,setActiveCategory}) => {
+const Menu = ({products,activeCategory,t,setActiveCategory,addToCart}) => {
   return (
    <section className="menu-section">
         <div className="container">

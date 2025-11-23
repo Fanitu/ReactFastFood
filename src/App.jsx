@@ -114,24 +114,7 @@ const App = () => {
   const t = translations[currentLanguage];
 
   // Hero slider images and texts
-  const heroSlides = [
-    {
-      image: "https://images.unsplash.com/photo-1571091718767-18b5b1457add?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxzZWFyY2h8OXx8YnVyZ2VyfGVufDB8fDB8fHww&w=1000&q=80",
-      text: t.betterTaste
-    },
-    {
-      image: "https://images.unsplash.com/photo-1626700051175-6818013e1d4f?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxzZWFyY2h8NHx8ZnJlc2glMjBqdWljZXxlbnwwfHwwfHx8MA%3D%3D&w=1000&q=80",
-      text: "Fresh Juices Made Daily With Love and Care!"
-    },
-    {
-      image: "https://images.unsplash.com/photo-1565299624946-b28f40a0ca4b?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxzZWFyY2h8OXx8cGl6emF8ZW58MHx8MHx8fDA%3D&w=1000&q=80",
-      text: "Delicious Pizzas That Will Make Your Day Better!"
-    },
-    {
-      image: "https://images.unsplash.com/photo-1555949963-aa79dcee981c?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxzZWFyY2h8Mnx8Y2hpY2tlbiUyMGZyaWVkfGVufDB8fDB8fHww&w=1000&q=80",
-      text: "Crispy Fried Chicken That Melts in Your Mouth!"
-    }
-  ];
+ 
 
   // Sample products data
   const products = {
@@ -182,14 +165,6 @@ const App = () => {
   // Top orders (sample data)
   const topOrders = products.FATA.slice(0, 4);
 
-  // Auto slide hero
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setCurrentSlide((prev) => (prev + 1) % heroSlides.length);
-    }, 10000);
-    return () => clearInterval(interval);
-  }, []);
-
   // Add to cart function
   const addToCart = (product) => {
     setCartItems(prev => {
@@ -235,9 +210,9 @@ const App = () => {
 
       {/* Hero Section */}
       <Hero
-      heroSlides={heroSlides}
       currentSlide={currentSlide}
       t ={t}
+      setCurrentSlide={setCurrentSlide}
       />
 
       {/* Menu Section */}
@@ -246,6 +221,7 @@ const App = () => {
       activeCategory={activeCategory}
       t={t}
       setActiveCategory={setActiveCategory}
+      addToCart={addToCart}
       />
 
       {/* Testimonials Section */}
@@ -280,6 +256,7 @@ const App = () => {
        cartItems={cartItems}
        t={t}
        setCartItems={setCartItems}
+       cartTotal={cartTotal}
       />
         {/*/Order Sidebar */}
       <OrderSidebar 
