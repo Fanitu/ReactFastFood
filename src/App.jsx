@@ -25,6 +25,20 @@ const App = () => {
     email: '',
     message: ''
   });
+const [isSignUpOpen, setIsSignUpOpen] = useState(false);
+const [isSignInOpen, setIsSignInOpen] = useState(false);
+const [authForm, setAuthForm] = useState({
+  name: '',
+  phone: '',
+  password: '',
+  confirmPassword: ''
+});
+const [signInForm, setSignInForm] = useState({
+  name: '',
+  password: ''
+});
+const [authError, setAuthError] = useState('');
+const [authSuccess, setAuthSuccess] = useState('');
 
   // Language translations
   const translations = {
@@ -53,8 +67,20 @@ const App = () => {
       testimonial1: "The best fast food in town! Their burgers are amazing and the juice is always fresh.",
       testimonial2: "Quick delivery and great customer service. I order from them every week!",
       testimonial3: "The quality of their food is outstanding. Highly recommended!",
-      testimonial4: "Amazing taste and affordable prices. YoYo is my go-to place for quick meals."
-    },
+      testimonial4: "Amazing taste and affordable prices. YoYo is my go-to place for quick meals.",
+      signIn: "Sign In",
+      signUp: "Sign Up",
+      fullName: "Full Name",
+      phone: "Phone Number",
+      password: "Password",
+      confirmPassword: "Confirm Password",
+      createAccount: "Create Account",
+      login: "Login",
+      dontHaveAccount: "Don't have an account?",
+      alreadyHaveAccount: "Already have an account?",
+      signUpHere: "Sign Up here",
+      signInHere: "Sign In here"
+   },
     Amharic: {
       shopName: "ዮዮ ፋስት ፉድ",
       location: "አዲስ አበባ, ኢትዮጵያ",
@@ -80,7 +106,19 @@ const App = () => {
       testimonial1: "በከተማው ውስጥ ከሚገኙት ሁሉ ጥሩው ፋስት ፉድ! በርገሮቻቸው አስደናቂ ናቸው።",
       testimonial2: "ፈጣን አቅራቢያ እና አስደናቂ የደንበኞች አገልግሎት። በሳምንት ከእነሱ እዘዛለሁ!",
       testimonial3: "የምግባቸው ጥራት አስደናቂ ነው። በጣም ይመከራል!",
-      testimonial4: "አስደናቂ ጣዕም እና ተመጣጣኝ ዋጋ። ዮዮ ለፈጣን ምግቦች የምሄድበት ቦታ ነው።"
+      testimonial4: "አስደናቂ ጣዕም እና ተመጣጣኝ ዋጋ። ዮዮ ለፈጣን ምግቦች የምሄድበት ቦታ ነው።",
+      signIn: "ግባ",
+      signUp: "ይመዝገቡ",
+      fullName: "ሙሉ ስም",
+      phone: "ስልክ ቁጥር",
+      password: "የይለፍ ቃል",
+      confirmPassword: "የይለፍ ቃል አረጋግጥ",
+      createAccount: "መለያ ይፍጠሩ",
+      login: "ግባ",
+      dontHaveAccount: "መለያ የሎትም?",
+      alreadyHaveAccount: "ቀድሞውኑ መለያ አሎት?",
+      signUpHere: "እዚህ ይመዝገቡ",
+      signInHere: "እዚህ ግቡ"
     },
     Tigrigha: {
       shopName: "ዮዮ ፋስት ፉድ",
@@ -107,7 +145,19 @@ const App = () => {
       testimonial1: "ኣብታ ኸተማ ዘሎ ዝበለጸ ፋስት ፉድ! በርገሮም ኣዝዮም ጽቡቕ እዮም።",
       testimonial2: "ቅልጡፍ ምድሓን እሞ ኣዝዩ ጽቡቕ ናይ ዓማዊል ኣገልግሎት። በየንደፈ ካርኦም እዘዛለኹ!",
       testimonial3: "ጥራይ መግቦም ኣዝዩ ረቂቕ እዩ። ብምልከት እዩ ዝመክር!",
-      testimonial4: "ጽቡቕ ጣዕም እሞ ተመጣጣኒ ዋጋ። ዮዮ ንቅልጡፍ መኣዲ እትኸዲሉ ቦታይ እያ።"
+      testimonial4: "ጽቡቕ ጣዕም እሞ ተመጣጣኒ ዋጋ። ዮዮ ንቅልጡፍ መኣዲ እትኸዲሉ ቦታይ እያ።",
+      signIn: "ግባ",
+      signUp: "ይመዝገቡ",
+      fullName: "ሙሉ ስም",
+      phone: "ስልክ ቁጥር",
+      password: "የይለፍ ቃል",
+      confirmPassword: "የይለፍ ቃል አረጋግጥ",
+      createAccount: "መለያ ይፍጠሩ",
+      login: "ግባ",
+      dontHaveAccount: "መለያ የሎትም?",
+      alreadyHaveAccount: "ቀድሞውኑ መለያ አሎት?",
+      signUpHere: "እዚህ ይመዝገቡ",
+      signInHere: "እዚህ ግቡ"
     }
   };
 
@@ -186,14 +236,127 @@ const App = () => {
   // Calculate total
   const cartTotal = cartItems.reduce((total, item) => total + (item.price * item.quantity), 0);
 
-  // Handle contact form
+  // Add these functions to your component
+
+// Handle Sign Up form changes
+const handleAuthChange = (e) => {
+  setAuthForm({
+    ...authForm,
+    [e.target.name]: e.target.value
+  });
+};
+
+// Handle Sign In form changes
+const handleSignInChange = (e) => {
+  setSignInForm({
+    ...signInForm,
+    [e.target.name]: e.target.value
+  });
+};
+
+// Sign Up submission
+const handleSignUp = async (e) => {
+  e.preventDefault();
+  setAuthError('');
+  setAuthSuccess('');
+
+  // Basic validation
+  if (authForm.password !== authForm.confirmPassword) {
+    setAuthError('Passwords do not match');
+    return;
+  }
+
+  if (authForm.password.length < 6) {
+    setAuthError('Password must be at least 6 characters long');
+    return;
+  }
+
+  try {
+    const response = await fetch('http://localhost:27500/register', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        name: authForm.name,
+        phone: authForm.phone,
+        pwd: authForm.password
+      })
+    });
+
+    const data = await response.json();
+
+    if (response.ok) {
+      setAuthSuccess('Account created successfully! You can now sign in.');
+      setAuthForm({ name: '', phone: '', password: '', confirmPassword: '' });
+      setTimeout(() => {
+        setIsSignUpOpen(false);
+        setIsSignInOpen(true);
+      }, 2000);
+    } else {
+      setAuthError(data.message || 'Registration failed');
+      console.log(authError);
+    }
+  } catch (error) {
+    setAuthError('Network error. Please try again.');
+    console.log(error.message);
+  }
+};
+
+// Sign In submission
+const handleSignIn = async (e) => {
+  e.preventDefault();
+  setAuthError('');
+  setAuthSuccess('');
+
+  try {
+    const response = await fetch('http://localhost:27500/login', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        name: signInForm.name,
+        pwd: signInForm.password
+      })
+    });
+
+    const data = await response.json();
+
+    if (response.ok) {
+      setAuthSuccess('Login successful!');
+      setSignInForm({ name: '', password: '' });
+      // Here you can store the token/user data
+      localStorage.setItem('token', data.token);
+      localStorage.setItem('user', JSON.stringify(data.user));
+      setTimeout(() => {
+        setIsSignInOpen(false);
+      }, 1500);
+    } else {
+      setAuthError(data.message || 'Login failed');
+    }
+  } catch (error) {
+    setAuthError('Network error. Please try again.');
+    console.log(error.message);
+  }
+};
+
+// Close modals
+const closeAuthModals = () => {
+  setIsSignUpOpen(false);
+  setIsSignInOpen(false);
+  setAuthError('');
+  setAuthSuccess('');
+  setAuthForm({ name: '', phone: '', password: '', confirmPassword: '' });
+  setSignInForm({ name: '', password: '' });
+};
  
 
   return (
     <div className={`app ${darkMode ? 'dark-mode' : ''}`}>
 
       {/* Header */}
-      <Header setIsSidebarOpen={setIsSidebarOpen} t={t}/>
+      <Header setIsSidebarOpen={setIsSidebarOpen} t={t} setIsSignUpOpen={setIsSignUpOpen} setIsSignInOpen={setIsSignInOpen}/>
       
 
       {/* Sidebar */}
@@ -235,6 +398,127 @@ const App = () => {
       setContactForm={setContactForm}
       contactForm={contactForm}
       />
+
+
+      {/* Sign Up Modal */}
+<div className={`auth-modal ${isSignUpOpen ? 'open' : ''}`}>
+  <div className="auth-modal-content">
+    <button className="close-btn" onClick={closeAuthModals}>×</button>
+    <h2>{t.signUp}</h2>
+    
+    {authError && <div className="auth-message error">{authError}</div>}
+    {authSuccess && <div className="auth-message success">{authSuccess}</div>}
+    
+    <form onSubmit={handleSignUp} className="auth-form">
+      <div className="form-group">
+        <label htmlFor="name">{t.fullName}</label>
+        <input
+          type="text"
+          id="name"
+          name="name"
+          value={authForm.name}
+          onChange={handleAuthChange}
+          required
+          placeholder="Enter your full name"
+        />
+      </div>
+      
+      <div className="form-group">
+        <label htmlFor="phone">{t.phone}</label>
+        <input
+          type="tel"
+          id="phone"
+          name="phone"
+          value={authForm.phone}
+          onChange={handleAuthChange}
+          required
+          placeholder="Enter your phone number"
+        />
+      </div>
+      
+      <div className="form-group">
+        <label htmlFor="password">{t.password}</label>
+        <input
+          type="password"
+          id="password"
+          name="password"
+          value={authForm.password}
+          onChange={handleAuthChange}
+          required
+          placeholder="Enter your password"
+        />
+      </div>
+      
+      <div className="form-group">
+        <label htmlFor="confirmPassword">{t.confirmPassword}</label>
+        <input
+          type="password"
+          id="confirmPassword"
+          name="confirmPassword"
+          value={authForm.confirmPassword}
+          onChange={handleAuthChange}
+          required
+          placeholder="Confirm your password"
+        />
+      </div>
+      
+      <button type="submit" className="auth-submit-btn">
+        {t.createAccount}
+      </button>
+    </form>
+    
+    <p className="auth-switch">
+      {t.alreadyHaveAccount} <span onClick={() => { setIsSignUpOpen(false); setIsSignInOpen(true); }}>{t.signInHere}</span>
+    </p>
+  </div>
+</div>
+
+{/* Sign In Modal */}
+<div className={`auth-modal ${isSignInOpen ? 'open' : ''}`}>
+  <div className="auth-modal-content">
+    <button className="close-btn" onClick={closeAuthModals}>×</button>
+    <h2>{t.signIn}</h2>
+    
+    {authError && <div className="auth-message error">{authError}</div>}
+    {authSuccess && <div className="auth-message success">{authSuccess}</div>}
+    
+    <form onSubmit={handleSignIn} className="auth-form">
+      <div className="form-group">
+        <label htmlFor="signinName">{t.fullName}</label>
+        <input
+          type="text"
+          id="signinName"
+          name="name"
+          value={signInForm.name}
+          onChange={handleSignInChange}
+          required
+          placeholder="Enter your full name"
+        />
+      </div>
+      
+      <div className="form-group">
+        <label htmlFor="signinPassword">{t.password}</label>
+        <input
+          type="password"
+          id="signinPassword"
+          name="password"
+          value={signInForm.password}
+          onChange={handleSignInChange}
+          required
+          placeholder="Enter your password"
+        />
+      </div>
+      
+      <button type="submit" className="auth-submit-btn">
+        {t.login}
+      </button>
+    </form>
+    
+    <p className="auth-switch">
+      {t.dontHaveAccount} <span onClick={() => { setIsSignInOpen(false); setIsSignUpOpen(true); }}>{t.signUpHere}</span>
+    </p>
+  </div>
+</div>
 
       {/* Footer */}
       <Footer 
@@ -284,6 +568,16 @@ const App = () => {
         <div 
           className="overlay"
           onClick={() => setIsOrderOpen(false)}
+        ></div>
+      )}
+      {/* Overlay */}
+      {(isSidebarOpen || isSignUpOpen || isSignInOpen) && (
+        <div 
+          className="overlay"
+          onClick={() => {
+            if (isSidebarOpen) setIsSidebarOpen(false);
+            if (isSignUpOpen || isSignInOpen) closeAuthModals();
+          }}
         ></div>
       )}
     </div>
