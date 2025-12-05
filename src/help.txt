@@ -1,0 +1,215 @@
+last checkout
+
+
+import { useState } from 'react';
+
+const Checkout = ({setSelectedPaymentMethod,setReceiptUrl,selectedPaymentMethod,setIsSignInOpen,cartTotal,cartItems,setOrders,receiptUrl,setCartItems}) => {
+  const [userLocation, setUserLocation] = useState(null);
+  const [locationError, setLocationError] = useState('');
+  const [userEnteredAddressString,setUserEnteredAddressString]=useState('');
+  const [orderMessage,setOrderMessage] = useState('');
+
+  // Function to get the user's current location
+  const handleGetLocation = () => {
+    // Clear previous errors
+    setLocationError('');
+
+    // Check if the browser supports geolocation
+    if (!navigator.geolocation) {
+      setLocationError('Geolocation is not supported by your browser.');
+      return;
+    }
+
+    // Get the current position
+    navigator.geolocation.getCurrentPosition(
+      // Success callback
+      (position) => {
+        const { latitude, longitude } = position.coords;
+        setUserLocation({ latitude, longitude });
+        // You can also automatically fill a "Delivery Address" text field here
+        // by reverse geocoding (see "Pro Tips" below).
+      },
+      // Error callback
+      (error) => {
+        switch (error.code) {
+          case error.PERMISSION_DENIED:
+            setLocationError('User denied the request for Geolocation.');
+            break;
+          case error.POSITION_UNAVAILABLE:
+            setLocationError('Location information is unavailable.');
+            break;
+          case error.TIMEOUT:
+            setLocationError('The request to get user location timed out.');
+            break;
+          default:
+            setLocationError('An unknown error occurred.');
+            break;
+        }
+      },
+      // Options (optional)
+      {
+        maximumAge: 600000 // Cache location for 10 minutes
+      }
+    );
+  };
+
+  // Function to add a new order to the state
+const addNewOrder = (newOrder) => {
+    setOrders(prevOrders => [...prevOrders, newOrder]);
+};
+  // Function to handle order submission
+const handleSubmitOrder = async () => {
+   setLocationError('');
+    if (!userLocation) {
+      alert('Please provide your delivery location.');
+      return;
+    }
+    if (!receiptUrl) {
+      setLocationError('receipt Url is required?.');
+      return;
+    }
+
+     try {
+      const response = await fetch('http://localhost:27500/order', {
+        method: 'POST',
+        headers: { 
+           "authorization":`Bearer ${localStorage.token}`,
+          'Content-Type': 'application/json'
+           },
+        body: JSON.stringify({
+            items: cartItems,
+            totalAmount: cartTotal,
+            deliveryAddress: { // This is the key part!
+              coordinates: [userLocation.longitude, userLocation.latitude], // GeoJSON standard: [lng, lat]
+              address: userEnteredAddressString // A human-readable address from a form field
+            },
+            receiptUrl:receiptUrl,
+            status: 'pending',
+        })
+      });
+
+      if(response.status === 401){
+        localStorage.removeItem('token');
+        window.location.href ="/login"
+      }
+
+      if(!response.ok){
+        const errorText = await response.text();
+        throw new Error(`Https error !status code ${response.status} - ${errorText}`);
+      }
+      const data = await response.json();
+      setOrderMessage('Order Created Succesfully!');
+      addNewOrder(data);
+      console.log(data);
+      setTimeout(() => {
+        setSelectedPaymentMethod('');
+        setCartItems([]);
+      }, 4000);
+    } catch (err) {
+      console.error('Failed to create order:', err);
+       setOrderMessage('Failed to create order:', err);
+       setIsSignInOpen(true);
+
+    }
+  };
+  return (
+    <div>
+      {/* ... other checkout fields ... */}
+      
+      <div>
+        <p>Delivery Location</p>
+        <button type="button" onClick={handleGetLocation}>
+          📍 Use My Current Location
+        </button>
+        {userLocation && (
+          <p>
+            Location Captured: {userLocation.latitude.toFixed(4)}, {userLocation.longitude.toFixed(4)}
+          </p>
+        )}
+        {locationError && <p style={{ color: 'red' }}>Error: {locationError}</p>}
+        <br/>
+        {/* It's good practice to also let users type their address as a fallback */}
+        <label>
+          Or Enter Full Address:
+          <input type="text" value={userEnteredAddressString} onChange={(e) => setUserEnteredAddressString(e.target.value)} />
+        </label>
+      </div>
+       {orderMessage && <p>{orderMessage}</p>}
+    <button 
+      className='orderButton'
+      onClick={handleSubmitOrder}
+    >
+    Place the order
+    </button>
+   
+    </div>
+  );
+};
+
+export default Checkout;
+
+
+
+
+last authProvider
+
+
+
+
+
+// src/contexts/AuthContext.js
+import React, { createContext, useState, useContext } from 'react';
+
+const AuthContext = createContext({});
+
+export const useAuth = () => useContext(AuthContext);
+
+export const AuthProvider = ({ children }) => {
+  const [user, setUser] = useState(() => {
+    const saved = localStorage.getItem('user');
+    return saved ? JSON.parse(saved) : null;
+  });
+
+  const [currentView, setCurrentView] = useState('home'); // Track which "page" to show
+
+  const login = (userData, token) => {
+    setUser(userData);
+    localStorage.setItem('user', JSON.stringify(userData));
+    localStorage.setItem('token', token);
+    
+    // Set default view based on role
+    console.log(userData.role)
+    if (userData.role === 'driver') {
+      setCurrentView('driver');
+    } else if (userData.role === 'admin') {
+      setCurrentView('admin');
+    } else if(userData.role === 'waiter'){
+      setCurrentView('waiter');
+    }else {
+      setCurrentView('customer');
+    }
+  };
+  
+  const logout = () => {
+    setUser(null);
+    setCurrentView('home');
+    localStorage.removeItem('user');
+    localStorage.removeItem('token');
+  };
+
+  const switchView = (view) => {
+    setCurrentView(view);
+  };
+
+  return (
+    <AuthContext.Provider value={{ 
+      user, 
+      login, 
+      logout, 
+      currentView, 
+      switchView 
+    }}>
+      {children}
+    </AuthContext.Provider>
+  );
+};

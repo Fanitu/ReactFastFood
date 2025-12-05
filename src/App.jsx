@@ -1,16 +1,25 @@
 import React, { useState, useEffect, useRef } from 'react';
-import Header from './Header';
-import Sidebar from './Sidebar';
-import Hero from './Hero';
-import Menu from './Menu';
-import Testimonial from './Testimonial';
-import Contact from './Contact';
-import Footer from './Footer';
-import Nav from './Nav';
-import CartSidebar from './CartSidebar';
-import OrderSidebar from './OrderSidebar';
+import Header from './layouts/Header';
+import Hero from './layouts/Hero';
+import Menu from './layouts/Menu';
+import Testimonial from './layouts/Testimonial';
+import Contact from './layouts/Contact';
+import Footer from './layouts/Footer';
+import Nav from './layouts/Nav';
+import Sidebar from './Sidebars/Sidebar';
+import CartSidebar from './Sidebars/CartSidebar';
+import OrderSidebar from './Sidebars/OrderSidebar';
+import SignUp from './Signing/SignUp';
+import SignIn from './Signing/SignIn';
+import DriverDashboard from './Driver/DriverDashboard';
+import { AuthProvider,useAuth } from './AuthContext/AuthContext';
+import Overlay from './Overlay/Overlay';
+import AdminDashboard from './admin/AdminDashboard';
+import WaiterDashboard from './WaiterDashboard/WaiterDashboard';
+import ErrorBoundary from '../errorBoundry/ErrorBoundary'
 
 const App = () => {
+  const { user,currentView ,login} = useAuth();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [darkMode, setDarkMode] = useState(false);
   const [currentLanguage, setCurrentLanguage] = useState('English');
@@ -27,7 +36,7 @@ const App = () => {
   });
 const [isSignUpOpen, setIsSignUpOpen] = useState(false);
 const [isSignInOpen, setIsSignInOpen] = useState(false);
-const [authForm, setAuthForm] = useState({
+const [authUserForm, setAuthUserForm] = useState({
   name: '',
   phone: '',
   password: '',
@@ -40,7 +49,6 @@ const [signInForm, setSignInForm] = useState({
 const [authError, setAuthError] = useState('');
 const [authSuccess, setAuthSuccess] = useState('');
 
-  // Language translations
   const translations = {
     English: {
       shopName: "YoYo Fast Food",
@@ -163,10 +171,6 @@ const [authSuccess, setAuthSuccess] = useState('');
 
   const t = translations[currentLanguage];
 
-  // Hero slider images and texts
- 
-
-  // Sample products data
   const products = {
     FATA: [
       { id: 1, name: "Fata with 3", price: 120, image: "https://images.unsplash.com/photo-1568901346375-23c9450c58cd?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxzZWFyY2h8Mnx8YnVyZ2VyfGVufDB8fDB8fHww&w=1000&q=80" },
@@ -211,42 +215,31 @@ const [authSuccess, setAuthSuccess] = useState('');
       { id: 26, name: "Hot chocolate", price: 90, image: "https://images.unsplash.com/photo-1578985545062-69928b1d9587?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxzZWFyY2h8NHx8Y2FrZXxlbnwwfHwwfHx8MA%3D%3D&w=1000&q=80" }
     ]
   };
-
-  // Top orders (sample data)
   const topOrders = products.FATA.slice(0, 4);
 
-  // Add to cart function
-  const addToCart = (product) => {
+  const addToCart = (product,price) => {
     setCartItems(prev => {
       const existing = prev.find(item => item.id === product.id);
       if (existing) {
         return prev.map(item => 
           item.id === product.id 
-            ? { ...item, quantity: item.quantity + 1 }
+            ? { ...item, quantity: item.quantity + 1 , price:price}
             : item
         );
       }
-      return [...prev, { ...product, quantity: 1 }];
+      return [...prev, { ...product, quantity: 1, price:price }];
     });
   };
-
-  // Remove from cart function
  
-
-  // Calculate total
   const cartTotal = cartItems.reduce((total, item) => total + (item.price * item.quantity), 0);
 
-  // Add these functions to your component
-
-// Handle Sign Up form changes
 const handleAuthChange = (e) => {
-  setAuthForm({
-    ...authForm,
+  setAuthUserForm({
+    ...authUserForm,
     [e.target.name]: e.target.value
   });
 };
 
-// Handle Sign In form changes
 const handleSignInChange = (e) => {
   setSignInForm({
     ...signInForm,
@@ -254,19 +247,18 @@ const handleSignInChange = (e) => {
   });
 };
 
-// Sign Up submission
 const handleSignUp = async (e) => {
   e.preventDefault();
   setAuthError('');
   setAuthSuccess('');
 
   // Basic validation
-  if (authForm.password !== authForm.confirmPassword) {
+  if (authUserForm.password !== authUserForm.confirmPassword) {
     setAuthError('Passwords do not match');
     return;
   }
 
-  if (authForm.password.length < 6) {
+  if (authUserForm.password.length < 6) {
     setAuthError('Password must be at least 6 characters long');
     return;
   }
@@ -278,9 +270,9 @@ const handleSignUp = async (e) => {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        name: authForm.name,
-        phone: authForm.phone,
-        pwd: authForm.password
+        name: authUserForm.name,
+        phone: authUserForm.phone,
+        pwd: authUserForm.password
       })
     });
 
@@ -288,22 +280,20 @@ const handleSignUp = async (e) => {
 
     if (response.ok) {
       setAuthSuccess('Account created successfully! You can now sign in.');
-      setAuthForm({ name: '', phone: '', password: '', confirmPassword: '' });
+      setAuthUserForm({ name: '', phone: '', password: '', confirmPassword: '' });
       setTimeout(() => {
         setIsSignUpOpen(false);
         setIsSignInOpen(true);
       }, 2000);
     } else {
       setAuthError(data.message || 'Registration failed');
-      console.log(authError);
     }
   } catch (error) {
     setAuthError('Network error. Please try again.');
-    console.log(error.message);
   }
 };
 
-// Sign In submission
+
 const handleSignIn = async (e) => {
   e.preventDefault();
   setAuthError('');
@@ -326,262 +316,174 @@ const handleSignIn = async (e) => {
     if (response.ok) {
       setAuthSuccess('Login successful!');
       setSignInForm({ name: '', password: '' });
-      // Here you can store the token/user data
-      localStorage.setItem('token', data.token);
-      localStorage.setItem('user', JSON.stringify(data.user));
+      login(data.user,data.token)
       setTimeout(() => {
         setIsSignInOpen(false);
+        setAuthSuccess('');
       }, 1500);
     } else {
       setAuthError(data.message || 'Login failed');
     }
   } catch (error) {
     setAuthError('Network error. Please try again.');
-    console.log(error.message);
   }
 };
 
-// Close modals
 const closeAuthModals = () => {
   setIsSignUpOpen(false);
   setIsSignInOpen(false);
   setAuthError('');
   setAuthSuccess('');
-  setAuthForm({ name: '', phone: '', password: '', confirmPassword: '' });
+  setAuthUserForm({ name: '', phone: '', password: '', confirmPassword: '' });
   setSignInForm({ name: '', password: '' });
 };
- 
+  const renderCustomerView = () => (
+    <ErrorBoundary>
+      <Header 
+        setIsSidebarOpen={setIsSidebarOpen}
+        t={t} 
+        setIsSignUpOpen={setIsSignUpOpen}
+        setIsSignInOpen={setIsSignInOpen}
+      />
+      
+      <Sidebar 
+        isSidebarOpen={isSidebarOpen} 
+        setIsSidebarOpen={setIsSidebarOpen} 
+        darkMode={darkMode}
+        setDarkMode={setDarkMode}
+        t={t}
+        topOrders={topOrders}
+        setCurrentLanguage={setCurrentLanguage}
+        currentLanguage={currentLanguage}
+      />
+
+      <Hero
+        currentSlide={currentSlide}
+        t={t}
+        setCurrentSlide={setCurrentSlide}
+      />
+
+      <Menu 
+        products={products}
+        activeCategory={activeCategory}
+        t={t}
+        setActiveCategory={setActiveCategory}
+        addToCart={addToCart}
+      />
+
+      <Testimonial 
+        t={t}
+      />
+
+      <Contact 
+        t={t}
+        setContactForm={setContactForm}
+        contactForm={contactForm}
+      />
+
+      <SignUp 
+        isSignUpOpen={isSignUpOpen}
+        closeAuthModals={closeAuthModals}
+        authError={authError}
+        authSuccess={authSuccess}
+        setAuthError={setAuthError}
+        setAuthSuccess={setAuthSuccess}
+        setAuthUserForm={setAuthUserForm}
+        t={t}
+        authUserForm={authUserForm}
+        handleAuthChange={handleAuthChange}
+        setIsSignUpOpen={setIsSignUpOpen}
+        setIsSignInOpen={setIsSignInOpen}
+        handleSignUp={handleSignUp}
+      />
+
+      <SignIn
+        isSignInOpen={isSignInOpen}
+        closeAuthModals={closeAuthModals}
+        handleSignIn={handleSignIn}
+        authError={authError}
+        authSuccess={authSuccess}
+        t={t}
+        setIsSignInOpen={setIsSignInOpen}
+        signInForm={signInForm}
+        handleSignInChange={handleSignInChange}
+      />
+
+      <Footer 
+        t={t}
+      />
+
+      <Nav 
+        t={t}
+        setIsCartOpen={setIsCartOpen}
+        setIsOrderOpen={setIsOrderOpen}
+        cartItems={cartItems}
+      />
+
+      <CartSidebar 
+        isCartOpen={isCartOpen}
+        setIsCartOpen={setIsCartOpen}
+        cartItems={cartItems}
+        t={t}
+        setCartItems={setCartItems}
+        cartTotal={cartTotal}
+        setOrders={setOrders}
+        Orders={orders}
+        setIsSignInOpen={setIsSignInOpen}
+      />
+  
+      <OrderSidebar 
+        isOrderOpen={isOrderOpen}
+        setIsOrderOpen={setIsOrderOpen}
+        orders={orders}
+      />
+
+      <Overlay
+        isSidebarOpen={isSidebarOpen}
+        setIsSidebarOpen={setIsSidebarOpen}
+        isCartOpen={isCartOpen}
+        setIsCartOpen={setIsCartOpen}
+        isOrderOpen={isOrderOpen}
+        setIsOrderOpen={setIsOrderOpen}
+        isSignUpOpen={isSignUpOpen}
+        isSignInOpen={isSignInOpen}
+        closeAuthModals={closeAuthModals}
+      />
+    </ErrorBoundary>
+  );
+
+  // FIX: Add loading state and proper conditional rendering
+  const renderContent = () => {
+    switch (currentView) {
+      case 'driver':
+        return <DriverDashboard />;
+      case 'admin':
+        return <AdminDashboard />;
+      case 'waiter':
+        return <WaiterDashboard />;
+      case 'customer':
+      case 'home':
+        return renderCustomerView();
+      default:
+        return <div>Loading...</div>;
+    }
+  };
 
   return (
     <div className={`app ${darkMode ? 'dark-mode' : ''}`}>
-
-      {/* Header */}
-      <Header setIsSidebarOpen={setIsSidebarOpen} t={t} setIsSignUpOpen={setIsSignUpOpen} setIsSignInOpen={setIsSignInOpen}/>
-      
-
-      {/* Sidebar */}
-      <Sidebar 
-      isSidebarOpen={isSidebarOpen} 
-      setIsSidebarOpen={setIsSidebarOpen} 
-      darkMode={darkMode}
-      setDarkMode={setDarkMode}
-      t={t}
-      topOrders={topOrders}
-      setCurrentLanguage={setCurrentLanguage}
-      currentLanguage={currentLanguage}
-      />
-
-      {/* Hero Section */}
-      <Hero
-      currentSlide={currentSlide}
-      t ={t}
-      setCurrentSlide={setCurrentSlide}
-      />
-
-      {/* Menu Section */}
-      <Menu 
-      products={products}
-      activeCategory={activeCategory}
-      t={t}
-      setActiveCategory={setActiveCategory}
-      addToCart={addToCart}
-      />
-
-      {/* Testimonials Section */}
-      <Testimonial 
-      t={t}
-      />
-
-      {/* Contact Section */}
-      <Contact 
-      t={t}
-      setContactForm={setContactForm}
-      contactForm={contactForm}
-      />
-
-
-      {/* Sign Up Modal */}
-<div className={`auth-modal ${isSignUpOpen ? 'open' : ''}`}>
-  <div className="auth-modal-content">
-    <button className="close-btn" onClick={closeAuthModals}>×</button>
-    <h2>{t.signUp}</h2>
-    
-    {authError && <div className="auth-message error">{authError}</div>}
-    {authSuccess && <div className="auth-message success">{authSuccess}</div>}
-    
-    <form onSubmit={handleSignUp} className="auth-form">
-      <div className="form-group">
-        <label htmlFor="name">{t.fullName}</label>
-        <input
-          type="text"
-          id="name"
-          name="name"
-          value={authForm.name}
-          onChange={handleAuthChange}
-          required
-          placeholder="Enter your full name"
-        />
-      </div>
-      
-      <div className="form-group">
-        <label htmlFor="phone">{t.phone}</label>
-        <input
-          type="tel"
-          id="phone"
-          name="phone"
-          value={authForm.phone}
-          onChange={handleAuthChange}
-          required
-          placeholder="Enter your phone number"
-        />
-      </div>
-      
-      <div className="form-group">
-        <label htmlFor="password">{t.password}</label>
-        <input
-          type="password"
-          id="password"
-          name="password"
-          value={authForm.password}
-          onChange={handleAuthChange}
-          required
-          placeholder="Enter your password"
-        />
-      </div>
-      
-      <div className="form-group">
-        <label htmlFor="confirmPassword">{t.confirmPassword}</label>
-        <input
-          type="password"
-          id="confirmPassword"
-          name="confirmPassword"
-          value={authForm.confirmPassword}
-          onChange={handleAuthChange}
-          required
-          placeholder="Confirm your password"
-        />
-      </div>
-      
-      <button type="submit" className="auth-submit-btn">
-        {t.createAccount}
-      </button>
-    </form>
-    
-    <p className="auth-switch">
-      {t.alreadyHaveAccount} <span onClick={() => { setIsSignUpOpen(false); setIsSignInOpen(true); }}>{t.signInHere}</span>
-    </p>
-  </div>
-</div>
-
-{/* Sign In Modal */}
-<div className={`auth-modal ${isSignInOpen ? 'open' : ''}`}>
-  <div className="auth-modal-content">
-    <button className="close-btn" onClick={closeAuthModals}>×</button>
-    <h2>{t.signIn}</h2>
-    
-    {authError && <div className="auth-message error">{authError}</div>}
-    {authSuccess && <div className="auth-message success">{authSuccess}</div>}
-    
-    <form onSubmit={handleSignIn} className="auth-form">
-      <div className="form-group">
-        <label htmlFor="signinName">{t.fullName}</label>
-        <input
-          type="text"
-          id="signinName"
-          name="name"
-          value={signInForm.name}
-          onChange={handleSignInChange}
-          required
-          placeholder="Enter your full name"
-        />
-      </div>
-      
-      <div className="form-group">
-        <label htmlFor="signinPassword">{t.password}</label>
-        <input
-          type="password"
-          id="signinPassword"
-          name="password"
-          value={signInForm.password}
-          onChange={handleSignInChange}
-          required
-          placeholder="Enter your password"
-        />
-      </div>
-      
-      <button type="submit" className="auth-submit-btn">
-        {t.login}
-      </button>
-    </form>
-    
-    <p className="auth-switch">
-      {t.dontHaveAccount} <span onClick={() => { setIsSignInOpen(false); setIsSignUpOpen(true); }}>{t.signUpHere}</span>
-    </p>
-  </div>
-</div>
-
-      {/* Footer */}
-      <Footer 
-      t={t}
-      />
-
-      {/* Fixed Bottom Navigation */}
-      <Nav 
-      t={t}
-      setIsCartOpen={setIsCartOpen}
-      setIsOrderOpen={setIsOrderOpen}
-      cartItems={cartItems}
-      />
-
-      {/* Cart Sidebar */}
-      <CartSidebar 
-       isCartOpen={isCartOpen}
-       setIsCartOpen={setIsCartOpen}
-       cartItems={cartItems}
-       t={t}
-       setCartItems={setCartItems}
-       cartTotal={cartTotal}
-      />
-        {/*/Order Sidebar */}
-      <OrderSidebar 
-      isOrderOpen={isOrderOpen}
-      setIsOrderOpen={setIsOrderOpen}
-      orders={orders}
-      />
-
-      {/* Overlay */}
-      {isSidebarOpen && (
-        <div 
-          className="overlay"
-          onClick={() => setIsSidebarOpen(false)}
-        ></div>
-      )}
-
-      {isCartOpen && (
-        <div 
-          className="overlay"
-          onClick={() => setIsCartOpen(false)}
-        ></div>
-      )}
-
-      {isOrderOpen && (
-        <div 
-          className="overlay"
-          onClick={() => setIsOrderOpen(false)}
-        ></div>
-      )}
-      {/* Overlay */}
-      {(isSidebarOpen || isSignUpOpen || isSignInOpen) && (
-        <div 
-          className="overlay"
-          onClick={() => {
-            if (isSidebarOpen) setIsSidebarOpen(false);
-            if (isSignUpOpen || isSignInOpen) closeAuthModals();
-          }}
-        ></div>
-      )}
+      {renderContent()}
     </div>
   );
 };
 
-export default App;
+function MainApp() {
+  return (
+    <AuthProvider>
+      <ErrorBoundary>
+        <App />
+      </ErrorBoundary>
+    </AuthProvider>
+  );
+}
+
+export default MainApp;

@@ -13,16 +13,16 @@ const OrderSidebar = ({isOrderOpen,setIsOrderOpen,orders}) => {
               </button>
         </div>
         <div className="order-items">
-          {orders.length === 0 ? (
+          {!orders ? (
             <p className="empty-cart">Your Orders is empty</p>
           ) : (
             <>
-              {orders.map(order => (
+              {(orders || []).map(order => (
                 <div key={order.id} className="cart-item">
                   <div className="cart-item-info">
-                    <h4>{order.id}</h4>
+                    <h4>{order._id}</h4>
                   </div>
-                  <strong>{order.total}</strong>
+                  <strong>{order.totalAmount}</strong>
                 </div>
               ))}
               <div className="cart-total">
@@ -32,6 +32,9 @@ const OrderSidebar = ({isOrderOpen,setIsOrderOpen,orders}) => {
               </button>
             </>
           )}
+
+
+          
         </div>
       </div>
   )

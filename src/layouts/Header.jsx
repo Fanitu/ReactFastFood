@@ -5,13 +5,14 @@ const Header = ({setIsSidebarOpen,t,setIsSignUpOpen,setIsSignInOpen}) => {
           <div className="header-content">
             <h1 className="logo">{t.shopName}</h1>
             <div className="header-buttons">
-              {/* Add these authentication buttons */}
+
               <button 
                 className="auth-btn sign-in-btn"
                 onClick={() => setIsSignInOpen(true)}
               >
                 {t.signIn}
               </button>
+              
               <button 
                 className="auth-btn sign-up-btn"
                 onClick={() => setIsSignUpOpen(true)}

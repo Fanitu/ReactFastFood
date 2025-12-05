@@ -27,7 +27,7 @@ const Menu = ({products,activeCategory,t,setActiveCategory,addToCart}) => {
                   <p className="price">{product.price} Birr</p>
                   <button 
                     className="add-to-cart-btn"
-                    onClick={() => addToCart(product)}
+                    onClick={() => addToCart(product,product.price)}
                   >
                     {t.addToCart}
                   </button>
