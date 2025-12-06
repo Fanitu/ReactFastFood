@@ -16,8 +16,6 @@ const MobilePay = ({setSelectedPaymentMethod,receiptUrl,setOrders,setReceiptUrl,
             value={receiptUrl}
             onChange={(e)=> setReceiptUrl(e.target.value)}
         />
-
-        <Checkout setSelectedPaymentMethod={setSelectedPaymentMethod} setIsSignInOpen={setIsSignInOpen} orders={orders} setCartItems={setCartItems} cartItems={cartItems} cartTotal={cartTotal} receiptUrl={receiptUrl} setOrders={setOrders}/>
     </div>
   )
 }

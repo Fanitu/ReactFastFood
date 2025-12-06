@@ -1,579 +1,499 @@
 // src/components/driver/ProfessionalDriverDashboard.js
-import React, { useState, useEffect, useRef } from 'react';
-import { MapContainer, TileLayer, Marker, Popup, Polyline, useMap } from 'react-leaflet';
-import L from 'leaflet';
-import 'leaflet/dist/leaflet.css';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '../AuthContext/AuthContext';
-
-// Custom Ethiopian-themed icons using emojis (no image imports)
-const createEthiopiaIcon = (emoji, color, size = 40) => L.divIcon({
-  html: `
-    <div style="
-      background: linear-gradient(135deg, ${color}, ${color}CC);
-      width: ${size}px;
-      height: ${size}px;
-      border-radius: 50%;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      color: white;
-      font-size: ${size * 0.5}px;
-      border: 3px solid white;
-      box-shadow: 0 4px 15px rgba(0,0,0,0.3);
-      text-shadow: 0 2px 4px rgba(0,0,0,0.3);
-    ">
-      ${emoji}
-    </div>
-  `,
-  iconSize: [size, size],
-  iconAnchor: [size / 2, size],
-  popupAnchor: [0, -size]
-});
-
-// Custom map controller
-const MapController = ({ center, zoom }) => {
-  const map = useMap();
-  useEffect(() => {
-    if (center) {
-      map.setView(center, zoom);
-    }
-  }, [center, zoom, map]);
-  return null;
-};
-
-// Animation for driver marker
-const AnimatedDriverMarker = ({ position }) => {
-  const [bounce, setBounce] = useState(0);
-  
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setBounce(prev => (prev === 0 ? 10 : 0));
-    }, 1500);
-    return () => clearInterval(interval);
-  }, []);
-
-  const markerStyle = {
-    transform: `translateY(-${bounce}px)`,
-    transition: 'transform 0.5s ease-in-out'
-  };
-
-  return (
-    <Marker position={position} icon={createEthiopiaIcon('🚗', '#078930', 50)}>
-      <Popup>
-        <div className="ethiopia-popup">
-          <h3>🏍️ የእርስዎ ቦታ</h3>
-          <p>አስተናጋጅ: መኮንን አለማየሁ</p>
-          <p>ሞተር ሳይክል • ETH-AB-1234</p>
-          <p>አሁን እየተጓዘ ነው</p>
-        </div>
-      </Popup>
-    </Marker>
-  );
-};
+import { useOrders } from '../../ApiService/UseOrders';
+import './DriverDashboard.css'
+ // We'll create this CSS file
 
 const ProfessionalDriverDashboard = () => {
   const { user, logout } = useAuth();
-  const mapRef = useRef();
-  const [driverLocation, setDriverLocation] = useState([9.0320, 38.7469]); // Addis Ababa
-  const [deliveryLocation, setDeliveryLocation] = useState([9.0450, 38.7569]);
-  const [route, setRoute] = useState([]);
-  const [zoomLevel, setZoomLevel] = useState(14);
-  const [currentOrder, setCurrentOrder] = useState({
-    id: 'ORD-ETH-2024-001',
-    customer: {
-      name: 'የስም ተጠቃሚ',
-      phone: '+251 91 234 5678',
-      avatar: '👤'
-    },
-    delivery: {
-      address: 'ቦሌ መዲና, መንገድ ፫፻፲፮, ህንጻ ፬ ፎቅ ፬፻፪',
-      instructions: 'ቤቱ ቀይ በረንዳ አለው፣ ሰላም አለው ብለው ይደውሉ',
-      floor: '4th Floor',
-      apartment: '412'
-    },
-    restaurant: {
-      name: 'Burger Palace ኢትዮጵያ',
-      address: 'ፒያሳ, ከአርበኞች ህንጻ አጠገብ'
-    },
-    items: [
-      { name: 'ቢራንዲ በርገር', quantity: 2, price: 180 },
-      { name: 'ፍራይ ብርስክት', quantity: 1, price: 120 },
-      { name: 'ኮከ ባልስ', quantity: 2, price: 60 }
-    ],
-    total: 600,
-    status: 'on_truck', // on_truck, delivered
-    payment: {
-      method: 'cash',
-      amount: 600,
-      status: 'pending'
-    },
-    timings: {
-      pickup: '10:45 AM',
-      estimated: '11:00 AM',
-      current: '10:55 AM'
-    },
-    distance: '2.5 km',
-    earnings: 50
-  });
+  const { orders = [], loading, error, stats = {}, updateOrderStatus } = useOrders() || {};
   
-  const [upcomingOrders, setUpcomingOrders] = useState([
-    {
-      id: 'ORD-ETH-2024-002',
-      restaurant: 'Pizza Heaven ኢትዮጵያ',
-      customer: 'ሚካኤል ኃይለማርያም',
-      address: 'መንገድ ፮, ከታዋቂው ቤተክርስቲያን በስተግራ',
-      eta: '25 min',
-      amount: 450
-    }
-  ]);
+  // Filter only onTruck orders for drivers
+  const onTruckOrders = (Array.isArray(orders) ? orders : []).filter(order => 
+    order.status === 'onTruck' || order.status === 'out-for-delivery'
+  );
+  
+  const [selectedOrder, setSelectedOrder] = useState(null);
+  const [deliveryConfirmation, setDeliveryConfirmation] = useState({
+    show: false,
+    orderId: null,
+    customerName: ''
+  });
 
-  const [stats, setStats] = useState({
+  // Auto-select first order if available
+  useEffect(() => {
+    if (onTruckOrders.length > 0 && !selectedOrder) {
+      setSelectedOrder(onTruckOrders[0]);
+    }
+  }, [onTruckOrders, selectedOrder]);
+
+  // Calculate driver stats
+  const driverStats = {
     today: {
-      deliveries: 8,
-      earnings: 560,
-      rating: 4.8,
+      deliveries: stats.delivered || 0,
+      earnings: (stats.delivered || 0) * 50, // Assuming 50 birr per delivery
+      onTimeRate: '95%',
       hours: '4h 30m'
     },
-    weekly: {
-      deliveries: 42,
-      earnings: 2940,
-      rating: 4.9
+    active: {
+      onTruck: stats.onTruck || 0,
+      ready: stats.ready || 0,
+      pending: stats.pending || 0
     }
-  });
+  };
 
-  // Initialize driver location
-  useEffect(() => {
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          const newLocation = [
-            position.coords.latitude,
-            position.coords.longitude
-          ];
-          setDriverLocation(newLocation);
-        },
-        () => {
-          console.log('Using default Addis Ababa location');
-        },
-        { enableHighAccuracy: true, timeout: 10000 }
-      );
-    }
-  }, []);
+  const handleSelectOrder = (order) => {
+    setSelectedOrder(order);
+  };
 
-  // Calculate route
-  useEffect(() => {
-    const calculateRoute = async () => {
-      try {
-        const response = await fetch(
-          `https://router.project-osrm.org/route/v1/driving/${driverLocation[1]},${driverLocation[0]};${deliveryLocation[1]},${deliveryLocation[0]}?overview=full&geometries=geojson`
-        );
-        const data = await response.json();
+  const handleConfirmDelivery = (order) => {
+    setDeliveryConfirmation({
+      show: true,
+      orderId: order._id || order.id,
+      customerName: order.customer?.name || 'Customer'
+    });
+  };
+
+  const handleDeliveryComplete = async () => {
+    if (!deliveryConfirmation.orderId) return;
+
+    try {
+      const result = await updateOrderStatus(deliveryConfirmation.orderId, 'delivered');
+      
+      if (result.success) {
+        // Show success message
+        alert(`✅ Order #${deliveryConfirmation.orderId} delivered successfully!`);
         
-        if (data.routes && data.routes[0]) {
-          const coordinates = data.routes[0].geometry.coordinates;
-          const routePoints = coordinates.map(coord => [coord[1], coord[0]]);
-          setRoute(routePoints);
+        // Reset confirmation dialog
+        setDeliveryConfirmation({ show: false, orderId: null, customerName: '' });
+        
+        // Remove delivered order from selected
+        if (selectedOrder && (selectedOrder._id === deliveryConfirmation.orderId || selectedOrder.id === deliveryConfirmation.orderId)) {
+          const remainingOrders = onTruckOrders.filter(order => 
+            order._id !== deliveryConfirmation.orderId && order.id !== deliveryConfirmation.orderId
+          );
+          setSelectedOrder(remainingOrders[0] || null);
         }
-      } catch (error) {
-        console.log('Using straight line route');
-        setRoute([driverLocation, deliveryLocation]);
+      } else {
+        alert(`Failed to update order: ${result.error}`);
       }
-    };
-
-    calculateRoute();
-  }, [driverLocation, deliveryLocation]);
-
-  const handleDeliveryComplete = () => {
-    setCurrentOrder(prev => ({
-      ...prev,
-      status: 'delivered'
-    }));
-    
-    // Show success message
-    setTimeout(() => {
-      if (upcomingOrders.length > 0) {
-        const nextOrder = upcomingOrders[0];
-        setCurrentOrder({
-          ...nextOrder,
-          status: 'on_truck'
-        });
-        setUpcomingOrders(prev => prev.slice(1));
-        alert('✅ ትዕዛዙ በተሳካ ሁኔታ ተደርሷል! ወደ ቀጣዩ ትዕዛዝ ይቀጥሉ።');
-      }
-    }, 1500);
+    } catch (err) {
+      alert('Error updating order status. Please try again.');
+    }
   };
 
-  const handleCallCustomer = () => {
-    window.open(`tel:${currentOrder.customer.phone}`, '_blank');
+  const handleCallCustomer = (phoneNumber) => {
+    if (phoneNumber) {
+      window.open(`tel:${phoneNumber}`, '_blank');
+    }
   };
 
-  const handleGetDirections = () => {
-    const url = `https://www.google.com/maps/dir/?api=1&destination=${deliveryLocation[0]},${deliveryLocation[1]}`;
-    window.open(url, '_blank');
+  const formatTime = (timeString) => {
+    if (!timeString) return '--:--';
+    const date = new Date(timeString);
+    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   };
 
-  // Calculate remaining time
-  const calculateRemainingTime = () => {
+  const calculateETA = (createdAt) => {
+    if (!createdAt) return 'Soon';
+    const created = new Date(createdAt);
     const now = new Date();
-    const estimated = new Date();
-    estimated.setHours(11, 0, 0); // 11:00 AM
-    const diff = Math.max(0, Math.floor((estimated - now) / 60000));
-    return diff > 0 ? `${diff} ደቂቃ` : 'በቅርቡ ይደርሳል';
+    const diffMinutes = Math.floor((now - created) / 60000);
+    
+    if (diffMinutes < 30) return `${30 - diffMinutes} min`;
+    if (diffMinutes < 60) return '30+ min';
+    return '>1 hour';
   };
+
+  const formatAddress = (addr) => {
+    if (!addr) return 'Address not specified';
+    if (typeof addr === 'string') return addr;
+    if (typeof addr === 'object') {
+      if (addr.address) return addr.address;
+      const parts = [addr.street, addr.city, addr.region, addr.country].filter(Boolean);
+      if (parts.length) return parts.join(', ');
+      try { return JSON.stringify(addr); } catch { return 'Address not specified'; }
+    }
+    return String(addr);
+  };
+
+  if (loading && orders.length === 0) {
+    return (
+      <div className="driver-dashboard loading">
+        <div className="loading-spinner">
+          <div className="spinner"></div>
+          <p>Loading driver orders...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="driver-dashboard error">
+        <div className="error-message">
+          <h3>🚨 Error Loading Orders</h3>
+          <p>{typeof error === 'string' ? error : (error?.message || JSON.stringify(error))}</p>
+          <button onClick={() => window.location.reload()}>Retry</button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="professional-driver-dashboard">
-      {/* ETHIOPIAN THEMED HEADER */}
-      <header className="ethiopia-header">
-        <div className="header-gradient">
-          <div className="header-content">
-            <div className="logo-section">
-              <div className="ethiopia-logo">
-                <span className="logo-icon">YoYo</span>
-                <div className="logo-text">
-                  <p className="tagline">Yoyo Restaurant Delivery system</p>
-                </div>
-              </div>
+      {/* Header */}
+      <header className="driver-header">
+        <div className="header-left">
+          <div className="logo">
+            <span className="logo-icon">🚗</span>
+            <h1>Driver Dashboard</h1>
+          </div>
+          <div className="driver-info">
+            <span className="driver-name">Welcome, {user?.name || 'Driver'}</span>
+            <span className="driver-id">ID: DRV-{String(user?.id || '').slice(-6) || '001'}</span>
+          </div>
+        </div>
+        
+        <div className="header-right">
+          <div className="header-stats">
+            <div className="stat-item">
+              <span className="stat-value">{driverStats.today.deliveries}</span>
+              <span className="stat-label">Today</span>
             </div>
-
-            <div className="driver-profile-section">
-              <div className="driver-card">
-                <div className="driver-avatar">
-                  <span className="avatar-text">መ</span>
-                  <div className="online-status active"></div>
-                </div>
-                <div className="driver-info">
-                  <h3>መኮንን አለማየሁ</h3>
-                </div>
-              </div>
-
-              <div className="stats-preview">
-                <div>
-                  <button className="btn-logout" onClick={logout}>Logout</button>
-                </div>
-              </div>
+            <div className="stat-item">
+              <span className="stat-value">{driverStats.today.earnings} ETB</span>
+              <span className="stat-label">Earnings</span>
+            </div>
+            <div className="stat-item">
+              <span className="stat-value">{onTruckOrders.length}</span>
+              <span className="stat-label">Active</span>
             </div>
           </div>
+          <button className="logout-btn" onClick={logout}>Logout</button>
         </div>
       </header>
 
-      {/* MAIN CONTENT - MAP & ORDERS */}
-      <main className="dashboard-main">
-        {/* LEFT SIDE - INTERACTIVE MAP */}
-        <div className="map-section">
-          <div className="map-header-controls">
-            <div className="map-title">
-              <h2>
-                <span className="map-icon">🗺️</span>
-                ቀጥታ አሰሳ
-                <span className="eta-badge">{calculateRemainingTime()}</span>
-              </h2>
-              <p className="map-subtitle">ወደ ደንበኛው ቦታ እየተጓዙ ነው</p>
-            </div>
-            
-            <div className="map-actions">
-              <button 
-                className="map-action-btn primary"
-                onClick={() => {
-                  if (mapRef.current) {
-                    mapRef.current.setView(driverLocation, 16);
-                  }
-                }}
-              >
-                <span className="btn-icon">📍</span>
-                ወደ እኔ
-              </button>
-              <button 
-                className="map-action-btn"
-                onClick={() => {
-                  if (mapRef.current) {
-                    const bounds = L.latLngBounds([driverLocation, deliveryLocation]);
-                    mapRef.current.fitBounds(bounds, { padding: [50, 50] });
-                  }
-                }}
-              >
-                <span className="btn-icon">👁️</span>
-                ሁሉንም አሳይ
-              </button>
-              <button 
-                className="map-action-btn"
-                onClick={() => setZoomLevel(z => Math.min(z + 1, 18))}
-              >
-                <span className="btn-icon">➕</span>
-                Zoom In
-              </button>
-              <button 
-                className="map-action-btn"
-                onClick={() => setZoomLevel(z => Math.max(z - 1, 10))}
-              >
-                <span className="btn-icon">➖</span>
-                Zoom Out
-              </button>
+      {/* Main Content */}
+      <main className="driver-main">
+        {/* Left Side - Active Orders List */}
+        <div className="orders-list-section">
+          <div className="section-header">
+            <h2>
+              <span className="section-icon">📦</span>
+              Active Deliveries ({onTruckOrders.length})
+            </h2>
+            <div className="status-filter">
+              <span className="filter-active active">On Truck ({stats.onTruck || 0})</span>
+              <span className="filter-ready">Ready ({stats.ready || 0})</span>
             </div>
           </div>
 
-          <div className="map-container-wrapper">
-            <MapContainer
-              center={driverLocation}
-              zoom={zoomLevel}
-              style={{ height: '100%', width: '100%' }}
-              ref={mapRef}
-              whenCreated={(mapInstance) => {
-                mapRef.current = mapInstance;
-              }}
-              className="ethiopia-map"
-            >
-              {/* Beautiful Map Tiles - Multiple Options */}
-              <TileLayer
-                attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-                url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                className="map-tiles"
-              />
-              
-              <AnimatedDriverMarker position={driverLocation} />
-
-              {/* Delivery Marker */}
-              <Marker position={deliveryLocation} icon={createEthiopiaIcon('📍', '#DA121A', 45)}>
-                <Popup>
-                  <div className="ethiopia-popup delivery">
-                    <h3>📦 የማድረስ ቦታ</h3>
-                    <p><strong>ደንበኛ:</strong> {currentOrder.customer.name}</p>
-                    <p><strong>አድራሻ:</strong> {currentOrder.delivery.address}</p>
-                    <p><strong>ፎቅ:</strong> {currentOrder.delivery.floor}</p>
-                    <p><strong>ማሰራጫ:</strong> {currentOrder.delivery.apartment}</p>
+          <div className="orders-container">
+            {onTruckOrders.length === 0 ? (
+              <div className="no-orders">
+                <div className="no-orders-icon">🚗</div>
+                <h3>No Active Deliveries</h3>
+                <p>All orders have been delivered. Great job!</p>
+                <p className="subtext">New orders will appear here automatically.</p>
+              </div>
+            ) : (
+              onTruckOrders.map((order) => (
+                <div 
+                  key={order._id || order.id}
+                  className={`order-card ${selectedOrder && (selectedOrder._id === order._id || selectedOrder.id === order.id) ? 'selected' : ''}`}
+                  onClick={() => handleSelectOrder(order)}
+                >
+                  <div className="order-card-header">
+                    <div className="order-id">#{order.orderNumber || order._id?.slice(-8) || 'N/A'}</div>
+                    <div className="order-time">{formatTime(order.createdAt)}</div>
+                  </div>
+                  
+                  <div className="order-card-body">
+                    <div className="customer-info">
+                      <div className="customer-avatar">
+                        {order.userName?.charAt(0) || 'C'}
+                      </div>
+                      <div className="customer-details">
+                        <h4>{order.userName || 'Customer'}</h4>
+                        <p className="customer-phone">{order.userPhone || 'No phone'}</p>
+                      </div>
+                    </div>
+                    
+                    <div className="order-details">
+                      <div className="detail-item">
+                        <span className="detail-label">Restaurant:</span>
+                        <span className="detail-value">{order.restaurant?.name || 'Heri Restaurant'}</span>
+                      </div>
+                      <div className="detail-item">
+                        <span className="detail-label">Block Number:</span>
+                        <span className="detail-value">{order.blockNumber}</span>
+                      </div>
+                      <div className="detail-item">
+                        <span className="detail-label">Room Number:</span>
+                        <span className="detail-value">{order.roomNumber}</span>
+                      </div>
+                      <div className="detail-item">
+                        <span className="detail-label">ETA:</span>
+                        <span className="detail-value eta">{calculateETA(order.createdAt)}</span>
+                      </div>
+                    </div>
+                    
+                    <div className="order-items-preview">
+                      <span className="items-count">
+                        {order.items?.length || 0} items
+                      </span>
+                      <span className="order-total">
+                        {order.totalAmount || 0} ETB
+                      </span>
+                    </div>
+                  </div>
+                  
+                  <div className="order-card-footer">
                     <button 
-                      className="popup-call-btn"
-                      onClick={handleCallCustomer}
+                      className="deliver-btn"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleConfirmDelivery(order);
+                      }}
                     >
-                      📞 ደውል
+                      ✅ Deliver Now
+                    </button>
+                    <button 
+                      className="call-btn"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleCallCustomer(order.customer?.phone);
+                      }}
+                    >
+                      📞 Call
                     </button>
                   </div>
-                </Popup>
-              </Marker>
-
-              {/* Route Line */}
-              {route.length > 0 && (
-                <Polyline
-                  positions={route}
-                  color="#078930"
-                  weight={5}
-                  opacity={0.8}
-                  dashArray="15, 10"
-                  lineCap="round"
-                  className="animated-route"
-                />
-              )}
-
-              {/* Map Controller */}
-              <MapController center={driverLocation} zoom={zoomLevel} />
-            </MapContainer>
-          </div>
-
-          {/* Map Footer Stats */}
-          <div className="map-footer-stats">
-            <div className="map-stat-card">
-              <div className="stat-icon">🎯</div>
-              <div className="stat-content">
-                <div className="stat-value">{currentOrder.distance}</div>
-                <div className="stat-label">ርቀት</div>
-              </div>
-            </div>
-            <div className="map-stat-card">
-              <div className="stat-icon">⏱️</div>
-              <div className="stat-content">
-                <div className="stat-value">{calculateRemainingTime()}</div>
-                <div className="stat-label">ቀሪ ጊዜ</div>
-              </div>
-            </div>
-            <div className="map-stat-card">
-              <div className="stat-icon">💰</div>
-              <div className="stat-content">
-                <div className="stat-value">{currentOrder.earnings} ብር</div>
-                <div className="stat-label">ገቢ</div>
-              </div>
-            </div>
-            <div className="map-stat-card">
-              <div className="stat-icon">📦</div>
-              <div className="stat-content">
-                <div className="stat-value">{currentOrder.items.length}</div>
-                <div className="stat-label">እቃዎች</div>
-              </div>
-            </div>
+                </div>
+              ))
+            )}
           </div>
         </div>
 
-        {/* RIGHT SIDE - ORDER DETAILS */}
+        {/* Right Side - Order Details */}
         <div className="order-details-section">
-          {/* Current Order Card */}
-          <div className="current-order-card ethiopia-card">
-            <div className="order-card-header">
-              <div className="order-title">
+          {selectedOrder ? (
+            <div className="order-details-card">
+              <div className="details-header">
                 <h3>
-                  <span className="order-icon">📦</span>
-                  የአሁኑ ትዕዛዝ
+                  <span className="details-icon">📋</span>
+                  Order Details
+                  <span className="order-status-badge onTruck">On Truck</span>
                 </h3>
-                <div className={`order-status ${currentOrder.status}`}>
-                  {currentOrder.status === 'on_truck' ? '🚚 በመኪና ላይ' : '✅ ተደርሷል'}
+                <div className="order-meta">
+                  <span className="meta-item">#{selectedOrder.orderNumber || selectedOrder._id?.slice(-8)}</span>
+                  <span className="meta-item">📅 {formatTime(selectedOrder.createdAt)}</span>
                 </div>
               </div>
-              <div className="order-meta">
-                <span className="order-id">#{currentOrder.id}</span>
-                <span className="order-time">⏰ {currentOrder.timings.current}</span>
-              </div>
-            </div>
 
-            {/* Customer & Restaurant Info */}
-            <div className="info-grid">
-              <div className="info-card customer">
-                <div className="info-header">
-                  <span className="info-icon">👤</span>
-                  <h4>ደንበኛ</h4>
-                </div>
-                <div className="info-content">
-                  <p className="info-name">{currentOrder.customer.name}</p>
-                  <p className="info-phone">
-                    <span className="phone-icon">📱</span>
-                    {currentOrder.customer.phone}
-                  </p>
-                  <button 
-                    className="action-btn small"
-                    onClick={handleCallCustomer}
-                  >
-                    📞 ደውል
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            {/* Order Items */}
-            <div className="order-items-card">
-              <h4>
-                <span className="items-icon">📋</span>
-                የትዕዛዝ እቃዎች ({currentOrder.items.length})
-              </h4>
-              <div className="items-list">
-                {currentOrder.items.map((item, index) => (
-                  <div key={index} className="order-item-row">
-                    <span className="item-quantity">{item.quantity}x</span>
-                    <span className="item-name">{item.name}</span>
-                    <span className="item-price">{item.price} ብር</span>
-                  </div>
-                ))}
-              </div>
-              <div className="order-total">
-                <span>ጠቅላላ:</span>
-                <strong>{currentOrder.total} ብር</strong>
-              </div>
-            </div>
-
-            {/* Main Action Button */}
-            <div className="order-actions">
-              {currentOrder.status === 'on_truck' ? (
-                <button 
-                  className="deliver-btn"
-                  onClick={handleDeliveryComplete}
-                >
-                  <span className="btn-icon">✅</span>
-                  ትዕዛዙን አድርሰው ያረጋግጡ
-                </button>
-              ) : (
-                <button className="delivered-btn" disabled>
-                  <span className="btn-icon">🎉</span>
-                  ትዕዛዙ ተደርሷል!
-                </button>
-              )}
-
-              <div className="secondary-actions">
-                <button 
-                  className="secondary-btn"
-                  onClick={handleGetDirections}
-                >
-                  <span className="btn-icon">🗺️</span>
-                  መንገድ አሳይ
-                </button>
-                <button className="secondary-btn">
-                  <span className="btn-icon">📸</span>
-                  ፎቶ ያንሱ
-                </button>
-                <button className="secondary-btn warning">
-                  <span className="btn-icon">⚠️</span>
-                  ችግር አሳውቁ
-                </button>
-              </div>
-            </div>
-          </div>
-
-          {/* Upcoming Orders */}
-          {upcomingOrders.length > 0 && (
-            <div className="upcoming-orders-card ethiopia-card">
-              <div className="upcoming-header">
-                <h3>
-                  <span className="upcoming-icon">⏭️</span>
-                  ቀጣይ ትዕዛዞች
-                </h3>
-                <span className="upcoming-count">{upcomingOrders.length}</span>
-              </div>
-              
-              <div className="upcoming-list">
-                {upcomingOrders.map((order, index) => (
-                  <div key={order.id} className="upcoming-order-item">
-                    <div className="upcoming-number">#{index + 1}</div>
-                    <div className="upcoming-details">
-                      <div className="upcoming-header-line">
-                        <strong>{order.restaurant}</strong>
-                        <span className="upcoming-eta">{order.eta}</span>
+              <div className="details-content">
+                {/* Customer Info */}
+                <div className="detail-section">
+                  <h4 className="section-title">
+                    <span className="section-icon">👤</span>
+                    Customer Information
+                  </h4>
+                  <div className="customer-detail-card">
+                    <div className="customer-header">
+                      <div className="customer-avatar-large">
+                        {selectedOrder.userName?.charAt(0) || 'C'}
                       </div>
-                      <p className="upcoming-customer">{order.customer}</p>
-                      <p className="upcoming-address">{order.address}</p>
-                      <div className="upcoming-footer">
-                        <span className="upcoming-amount">{order.amount} ብር</span>
-                        <button className="upcoming-view-btn">👁️ አሳይ</button>
+                      <div>
+                        <h4>{selectedOrder.userName || 'Customer'}</h4>
+                        <p className="customer-contact">
+                          📱 {selectedOrder.userPhone || 'No phone provided'}
+                        </p>
+                      </div>
+                    </div>
+                    
+                    <div className="customer-actions">
+                      <button 
+                        className="action-btn primary"
+                        onClick={() => handleCallCustomer(selectedOrder.userPhone)}
+                      >
+                        📞 Call Customer
+                      </button>
+                      <button className="action-btn">
+                        📍 Get Directions
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Delivery Info */}
+                <div className="detail-section">
+                  <h4 className="section-title">
+                    <span className="section-icon">🏠</span>
+                    Delivery Address
+                  </h4>
+                  <div className="address-card">
+                    <p className="address-text">
+                     <strong> Block Number:</strong>
+                      {formatAddress(selectedOrder.blockNumber)}  --  
+                     <strong> Room Number:</strong>
+                      {formatAddress(selectedOrder.roomNumber)}
+                    </p>
+                    {selectedOrder.deliveryInstructions && (
+                      <div className="delivery-instructions">
+                        <strong>Instructions:</strong>
+                        <p>{selectedOrder.deliveryInstructions}</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Order Items */}
+                <div className="detail-section">
+                  <h4 className="section-title">
+                    <span className="section-icon">🍽️</span>
+                    Order Items ({selectedOrder.items?.length || 0})
+                  </h4>
+                  <div className="items-list">
+                    {selectedOrder.items && selectedOrder.items.length > 0 ? (
+                      selectedOrder.items.map((item, index) => (
+                        <div key={index} className="order-item">
+                          <div className="item-info">
+                            <span className="item-quantity">{item.quantity || 1}x</span>
+                            <span className="item-name">{item.name || 'Item'}</span>
+                          </div>
+                          <span className="item-price">
+                            {((item.price || 0) * (item.quantity || 1)).toFixed(2)} ETB
+                          </span>
+                        </div>
+                      ))
+                    ) : (
+                      <p className="no-items">No items listed</p>
+                    )}
+                    
+                    <div className="order-summary">
+                      <div className="summary-row">
+                        <span>Subtotal:</span>
+                        <span>{selectedOrder.subtotal || selectedOrder.totalAmount || 0} ETB</span>
+                      </div>
+                      <div className="summary-row">
+                        <span>Delivery Fee:</span>
+                        <span>{selectedOrder.deliveryFee || 0} ETB</span>
+                      </div>
+                      <div className="summary-row">
+                        <span>Tax:</span>
+                        <span>{selectedOrder.tax || 0} ETB</span>
+                      </div>
+                      <div className="summary-row total">
+                        <strong>Total:</strong>
+                        <strong>{selectedOrder.totalAmount || 0} ETB</strong>
+                      </div>
+                      <div className="summary-row earnings">
+                        <span>Your Earnings:</span>
+                        <span className="earnings-amount">50 ETB</span>
                       </div>
                     </div>
                   </div>
-                ))}
+                </div>
+
+                {/* Delivery Actions */}
+                <div className="detail-section">
+                  <h4 className="section-title">
+                    <span className="section-icon">✅</span>
+                    Delivery Actions
+                  </h4>
+                  <div className="delivery-actions">
+                    <button 
+                      className="deliver-action-btn primary"
+                      onClick={() => handleConfirmDelivery(selectedOrder)}
+                    >
+                      <span className="btn-icon">✅</span>
+                      Confirm Delivery
+                    </button>
+                    <div className="secondary-actions">
+                      <button className="action-btn">
+                        <span className="btn-icon">📸</span>
+                        Upload Photo
+                      </button>
+                      <button className="action-btn">
+                        <span className="btn-icon">📝</span>
+                        Add Note
+                      </button>
+                      <button className="action-btn warning">
+                        <span className="btn-icon">⚠️</span>
+                        Report Issue
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="no-order-selected">
+              <div className="empty-state">
+                <div className="empty-icon">🚗</div>
+                <h3>Select an Order</h3>
+                <p>Choose an order from the list to view details</p>
+                <p className="subtext">Click on any order card to view its details here</p>
               </div>
             </div>
           )}
-
-          {/* Quick Stats */}
-          <div className="quick-stats-card ethiopia-card">
-            <h3>
-              <span className="stats-icon">📊</span>
-              የዛሬ አፈፃፀም
-            </h3>
-            <div className="stats-grid">
-              <div className="stat-item-large">
-                <div className="stat-value-large">{stats.today.deliveries}</div>
-                <div className="stat-label-large">ትዕዛዞች</div>
-              </div>
-              <div className="stat-item-large">
-                <div className="stat-value-large">{stats.today.earnings} ብር</div>
-                <div className="stat-label-large">ገቢ</div>
-              </div>
-              <div className="stat-item-large">
-                <div className="stat-value-large">{stats.today.rating}/5</div>
-                <div className="stat-label-large">ደረጃ</div>
-              </div>
-              <div className="stat-item-large">
-                <div className="stat-value-large">{stats.today.hours}</div>
-                <div className="stat-label-large">ሰዓታት</div>
-              </div>
-            </div>
-          </div>
         </div>
       </main>
 
-      {/* DELIVERY SUCCESS TOAST */}
-      {currentOrder.status === 'delivered' && (
-        <div className="delivery-success-toast">
-          <div className="toast-content">
-            <span className="toast-icon">🎉</span>
-            <div className="toast-text">
-              <strong>በተሳካ ሁኔታ ተደርሷል!</strong>
-              <p>ትዕዛዝ #{currentOrder.id} ወደ ደንበኛው በተሳካ ሁኔታ ተደርሷል።</p>
+      {/* Delivery Confirmation Modal */}
+      {deliveryConfirmation.show && (
+        <div className="modal-overlay">
+          <div className="confirmation-modal">
+            <div className="modal-header">
+              <h3>Confirm Delivery</h3>
+              <button 
+                className="modal-close"
+                onClick={() => setDeliveryConfirmation({ show: false, orderId: null, customerName: '' })}
+              >
+                ×
+              </button>
             </div>
-            <button className="toast-close">✓</button>
+            
+            <div className="modal-content">
+              <div className="confirmation-icon">✅</div>
+              <p className="confirmation-text">
+                Are you sure you have delivered the order to <strong>{deliveryConfirmation.customerName}</strong>?
+              </p>
+              <p className="confirmation-subtext">
+                This action cannot be undone. Please verify the delivery before confirming.
+              </p>
+              
+              <div className="confirmation-checklist">
+                <label className="checklist-item">
+                  <input type="checkbox" />
+                  <span>Customer has received the order</span>
+                </label>
+                <label className="checklist-item">
+                  <input type="checkbox" />
+                  <span>Payment has been collected (if cash)</span>
+                </label>
+                <label className="checklist-item">
+                  <input type="checkbox" />
+                  <span>Food quality verified</span>
+                </label>
+              </div>
+            </div>
+            
+            <div className="modal-footer">
+              <button 
+                className="btn-secondary"
+                onClick={() => setDeliveryConfirmation({ show: false, orderId: null, customerName: '' })}
+              >
+                Cancel
+              </button>
+              <button 
+                className="btn-primary"
+                onClick={handleDeliveryComplete}
+              >
+                ✅ Confirm Delivery
+              </button>
+            </div>
           </div>
         </div>
       )}

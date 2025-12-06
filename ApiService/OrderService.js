@@ -1,8 +1,11 @@
 // services/orderService.js
 import axios from 'axios';
 
-
-const API_BASE_URL =  'http://localhost:27500';
+// Prefer env-configured base URL with Vite; fallback to localhost
+const API_BASE_URL =
+  typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_API_BASE_URL
+    ? import.meta.env.VITE_API_BASE_URL
+    : 'http://localhost:27500';
 
 // Create axios instance with interceptors
 const api = axios.create({
@@ -28,12 +31,20 @@ api.interceptors.request.use(
 api.interceptors.response.use(
   (response) => response.data,
   (error) => {
-    if (error.response?.status === 401) {
-      // Handle unauthorized access
-      localStorage.removeItem('token');
-      window.location.href = '/login';
+    const status = error.response?.status;
+    const data = error.response?.data;
+    if (status === 401) {
+      try {
+        localStorage.removeItem('token');
+      } catch {}
+      // let the app route guard handle redirection
     }
-    return Promise.reject(error.response?.data || error.message);
+    const normalized = {
+      status: status || 0,
+      message: data?.message || data?.error || error.message || 'Request failed',
+      data,
+    };
+    return Promise.reject(normalized);
   }
 );
 
@@ -42,9 +53,8 @@ export const orderService = {
   async getAllOrders(filters = {}) {
     const params = new URLSearchParams();
     Object.entries(filters).forEach(([key, value]) => {
-      if (value) params.append(key, value);
+      if (value !== undefined && value !== null && value !== '') params.append(key, value);
     });
-    
     return api.get(`/order?${params.toString()}`);
   },
 
@@ -75,19 +85,20 @@ export const orderService = {
 
   // Real-time connection setup
   connectToOrderUpdates(callback) {
-    // You can implement WebSocket or SSE here
-    const eventSource = new EventSource(`${API_BASE_URL}/order/updates`);
-    
-    eventSource.onmessage = (event) => {
-      const data = JSON.parse(event.data);
-      callback(data);
-    };
-
-    eventSource.onerror = (error) => {
-      console.error('EventSource failed:', error);
-      // Implement reconnection logic
-    };
-
-    return () => eventSource.close();
+    try {
+      const eventSource = new EventSource(`${API_BASE_URL}/order/updates`);
+      eventSource.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          callback(data);
+        } catch {}
+      };
+      eventSource.onerror = () => {
+        // passive error; could add exponential backoff reconnect here
+      };
+      return () => eventSource.close();
+    } catch {
+      return () => {};
+    }
   }
 };

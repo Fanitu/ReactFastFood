@@ -1,52 +1,183 @@
 // src/components/admin/AdminDashboard.js
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useAuth } from '../AuthContext/AuthContext';
+import { orderService } from '../../ApiService/OrderService';
+import './AdminDashboard.css';
+
+const STATUS_OPTIONS = ['all','pending','confirmed','preparing','ready','out-for-delivery','delivered','cancelled'];
+const DATE_FILTERS = ['today','thisWeek','thisMonth'];
+
+const formatCurrency = (num) => {
+  const n = Number(num || 0);
+  return `${n.toLocaleString()} Birr`;
+};
+
+const startOfDay = (d) => { const x = new Date(d); x.setHours(0,0,0,0); return x; };
+const formatDay = (d) => new Date(d).toISOString().slice(0,10);
 
 const AdminDashboard = () => {
   const { user, logout } = useAuth();
-  const [stats, setStats] = useState({
-    totalOrders: 1247,
-    activeOrders: 13,
-    totalRevenue: 22850,
-    activeDrivers: 2,
-    totalCustomers: 1892,
-    totalRestaurants: 2,
-    todayRevenue: 2345.67,
-    pendingIssues: 8
-  });
-  
-  const [recentOrders, setRecentOrders] = useState([]);
-  const [topDrivers, setTopDrivers] = useState([]);
-  const [activeDrivers, setActiveDrivers] = useState([]);
 
+  // Filters and paging
+  const [dateFilter, setDateFilter] = useState('thisWeek');
+  const [status, setStatus] = useState('all');
+  const [search, setSearch] = useState('');
+  const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(10);
+
+  // Data state
+  const [ordersPage, setOrdersPage] = useState({ orders: [], total: 0, page: 1, pages: 1 });
+  const [ordersAgg, setOrdersAgg] = useState([]); // large list for aggregation
+  const [usersCount, setUsersCount] = useState(0);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+
+  // Fetch orders page (table)
+  const fetchOrdersPage = async () => {
+    const filters = { dateFilter, status, search, page, limit };
+    return orderService.getAllOrders(filters);
+  };
+
+  // Fetch larger batch for aggregates and chart
+  const fetchOrdersAgg = async () => {
+    const filters = { dateFilter, status: 'all', search: '', page: 1, limit: 1000 };
+    return orderService.getAllOrders(filters);
+  };
+
+  // Fetch users count
+  const fetchUsersCount = async () => {
+    try {
+      const res = await fetch('http://localhost:27500/user', {
+        headers: { 'Content-Type': 'application/json' }
+      });
+      const data = await res.json();
+      // Handle current backend shape: { "All Users": "[...]" }
+      let usersArr = [];
+      if (Array.isArray(data)) usersArr = data;
+      else if (Array.isArray(data.users)) usersArr = data.users;
+      else if (typeof data["All Users"] === 'string') {
+        try { usersArr = JSON.parse(data["All Users"]); } catch {}
+      }
+      return usersArr.length || 0;
+    } catch (e) {
+      return 0;
+    }
+  };
+
+  // Orchestrate fetches
   useEffect(() => {
-    // Mock recent orders
-    setRecentOrders([
-      { id: 'ORD-001', customer: 'John Doe', amount: 45.99, status: 'delivered', time: '10:30 AM' },
-      { id: 'ORD-002', customer: 'Jane Smith', amount: 28.50, status: 'preparing', time: '10:25 AM' },
-      { id: 'ORD-003', customer: 'Bob Johnson', amount: 67.80, status: 'on_the_way', time: '10:20 AM' },
-      { id: 'ORD-004', customer: 'Alice Brown', amount: 32.99, status: 'pending', time: '10:15 AM' },
-      { id: 'ORD-005', customer: 'Charlie Wilson', amount: 55.75, status: 'delivered', time: '10:10 AM' }
-    ]);
+    let active = true;
+    (async () => {
+      setLoading(true); setError(null);
+      try {
+        const [pageRes, aggRes, usersLen] = await Promise.all([
+          fetchOrdersPage(),
+          fetchOrdersAgg(),
+          fetchUsersCount(),
+        ]);
 
-    // Mock top drivers
-    setTopDrivers([
-      { id: 'DRV-001', name: 'Ashenafi Bedele', deliveries: 128, rating: 4.9, earnings: 2567.89 },
-      { id: 'DRV-002', name: 'shemsu adino', deliveries: 115, rating: 4.8, earnings: 2345.67 },
-   ]);
+        if (!active) return;
 
-    // Mock active drivers
-    setActiveDrivers([
-      { id: 'DRV-101', name: 'Ashenafi Bedele', status: 'delivering', location: 'Downtown', order: 'ORD-023' },
-      { id: 'DRV-102', name: 'shemsu adino', status: 'available', location: 'Uptown', order: null }
-    ]);
-  }, []);
+        const pageData = pageRes?.orders ? pageRes : { orders: Array.isArray(pageRes) ? pageRes : [], total: 0, page: 1, pages: 1 };
+        const aggData = aggRes?.orders ? aggRes.orders : (Array.isArray(aggRes) ? aggRes : []);
 
-  const updateDriverStatus = (driverId, status) => {
-    setActiveDrivers(prev =>
-      prev.map(driver =>
-        driver.id === driverId ? { ...driver, status } : driver
-      )
+        setOrdersPage({
+          orders: pageData.orders || [],
+          total: pageData.total || (pageData.orders?.length || 0),
+          page: pageData.page || 1,
+          pages: pageData.pages || 1,
+        });
+        setOrdersAgg(aggData || []);
+        setUsersCount(usersLen || 0);
+      } catch (e) {
+        setError(e?.message || 'Failed to load admin data');
+      } finally {
+        if (active) setLoading(false);
+      }
+    })();
+    return () => { active = false; };
+  }, [dateFilter, status, search, page, limit]);
+
+  // Aggregations from ordersAgg
+  const kpis = useMemo(() => {
+    const list = Array.isArray(ordersAgg) ? ordersAgg : [];
+    const todayStart = startOfDay(new Date());
+
+    let totalRevenue = 0;
+    let revenueToday = 0;
+    let activeOrders = 0;
+    let deliveredToday = 0;
+    let pendingIssues = 0;
+
+    const buckets = new Map(); // key: YYYY-MM-DD -> sum
+
+    for (const o of list) {
+      const amt = Number(o.totalAmount || 0);
+      totalRevenue += amt;
+
+      const created = new Date(o.createdAt || o.updatedAt || Date.now());
+      const key = formatDay(created);
+      buckets.set(key, (buckets.get(key) || 0) + amt);
+
+      if (created >= todayStart) revenueToday += amt;
+      const st = o.status || 'pending';
+      if (st === 'pending') pendingIssues++;
+      if (st !== 'delivered' && st !== 'cancelled') activeOrders++;
+      if (st === 'delivered' && created >= todayStart) deliveredToday++;
+    }
+
+    // build series sorted by date asc
+    const revenueSeries = Array.from(buckets.entries())
+      .sort(([a],[b]) => a.localeCompare(b))
+      .map(([date, value]) => ({ date, value }));
+
+    return {
+      totalRevenue,
+      revenueToday,
+      activeOrders,
+      deliveredToday,
+      pendingIssues,
+      revenueSeries,
+    };
+  }, [ordersAgg]);
+
+  // Handlers
+  const onSearchSubmit = (e) => { e.preventDefault(); setPage(1); };
+  const changePage = (p) => { if (p >= 1 && p <= (ordersPage.pages || 1)) setPage(p); };
+
+  // UI helpers
+  const Loading = () => (
+    <div className="admin-loading">Loading dashboard...</div>
+  );
+  const ErrorView = ({ message }) => (
+    <div className="admin-error">{message}</div>
+  );
+
+  // Simple SVG bar chart
+  const RevenueChart = ({ data }) => {
+    const width = 600; const height = 220; const padding = 32;
+    const values = data.map(d => d.value);
+    const max = Math.max(1, ...values);
+    const barWidth = (width - padding * 2) / Math.max(1, data.length);
+    return (
+      <svg width="100%" height={height} viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none">
+        {data.map((d, i) => {
+          const h = Math.round((d.value / max) * (height - padding * 2));
+          const x = padding + i * barWidth;
+          const y = height - padding - h;
+          return (
+            <g key={d.date}>
+              <rect x={x + 2} y={y} width={Math.max(2, barWidth - 6)} height={h} rx="4" fill="#078930" />
+              {/* label */}
+              {barWidth > 28 && (
+                <text x={x + barWidth/2} y={height - padding + 16} textAnchor="middle" fontSize="10" fill="#666">
+                  {d.date.slice(5)}
+                </text>
+              )}
+            </g>
+          );
+        })}
+      </svg>
     );
   };
 
@@ -59,250 +190,158 @@ const AdminDashboard = () => {
           <p>Welcome back, {user?.name || 'Admin'}! Here's your overview.</p>
         </div>
         <div className="header-actions">
-          <div className="header-stats">
-            <span className="live-indicator"></span>
-            <span>Live Updates</span>
-          </div>
-          <button className="btn-notification">🔔 <span className="notification-count">3</span></button>
-          <button className="btn-settings">⚙</button>
+          <form onSubmit={onSearchSubmit} className="admin-search">
+            <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search orders, customers, items, ID" />
+            <button type="submit">Search</button>
+          </form>
+          <select value={dateFilter} onChange={(e) => { setDateFilter(e.target.value); setPage(1); }} className="time-select">
+            {DATE_FILTERS.map(f => <option key={f} value={f}>{f}</option>)}
+          </select>
           <button className="btn-logout" onClick={logout}>Logout</button>
         </div>
       </div>
 
-      {/* Quick Stats */}
-      <div className="quick-stats">
-        <div className="stat-card large">
-          <div className="stat-icon">💰</div>
-          <div className="stat-content">
-            <h3>Total Revenue</h3>
-            <p className="stat-value">{stats.totalRevenue.toLocaleString()} Birr</p>
-            <p className="stat-change positive">↑ 12.5% this month</p>
-          </div>
-        </div>
-        
-        <div className="stat-card">
-          <div className="stat-icon">📦</div>
-          <div className="stat-content">
-            <h3>Active Orders</h3>
-            <p className="stat-value">{stats.activeOrders}</p>
-            <p className="stat-subtext">In progress</p>
-          </div>
-        </div>
-        
-        <div className="stat-card">
-          <div className="stat-icon">🚗</div>
-          <div className="stat-content">
-            <h3>Active Drivers</h3>
-            <p className="stat-value">{stats.activeDrivers}</p>
-            <p className="stat-subtext">On duty</p>
-          </div>
-        </div>
-        
-        <div className="stat-card">
-          <div className="stat-icon">👥</div>
-          <div className="stat-content">
-            <h3>Total Customers</h3>
-            <p className="stat-value">{stats.totalCustomers}</p>
-            <p className="stat-change positive">↑ 8.2%</p>
-          </div>
-        </div>
+      {/* Status Tabs */}
+      <div className="status-tabs">
+        {STATUS_OPTIONS.map(s => (
+          <button key={s} className={`tab ${status === s ? 'active' : ''}`} onClick={() => { setStatus(s); setPage(1); }}>
+            {s}
+          </button>
+        ))}
       </div>
 
-      {/* Main Dashboard */}
-      <div className="dashboard-grid">
-        {/* Left Column */}
-        <div className="left-column">
-          {/* Revenue Chart */}
-          <div className="chart-card">
-            <div className="chart-header">
-              <h3>Revenue Overview</h3>
-              <select className="time-select">
-                <option>Last 7 days</option>
-                <option>Last 30 days</option>
-                <option>Last 90 days</option>
-              </select>
-            </div>
-            <div className="chart-placeholder">
-              <div className="chart-bars">
-                {[65, 80, 75, 90, 85, 95, 100].map((height, i) => (
-                  <div key={i} className="chart-bar" style={{ height: `${height}% `}}>
-                    <div className="bar-tooltip">${(height * 100).toLocaleString()}</div>
-                  </div>
-                ))}
+      {loading && <Loading />}
+      {error && !loading && <ErrorView message={error} />}
+
+      {!loading && !error && (
+        <>
+          {/* Quick Stats */}
+          <div className="quick-stats">
+            <div className="stat-card large">
+              <div className="stat-icon">💰</div>
+              <div className="stat-content">
+                <h3>Total Revenue</h3>
+                <p className="stat-value">{formatCurrency(kpis.totalRevenue)}</p>
+                <p className="stat-subtext">{DATE_FILTERS.includes(dateFilter) ? dateFilter : 'range'}</p>
               </div>
-              <div className="chart-labels">
-                <span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span><span>Sun</span>
+            </div>
+            <div className="stat-card">
+              <div className="stat-icon">📦</div>
+              <div className="stat-content">
+                <h3>Active Orders</h3>
+                <p className="stat-value">{kpis.activeOrders}</p>
+                <p className="stat-subtext">In progress</p>
+              </div>
+            </div>
+            <div className="stat-card">
+              <div className="stat-icon">👥</div>
+              <div className="stat-content">
+                <h3>Total Users</h3>
+                <p className="stat-value">{usersCount}</p>
+                <p className="stat-subtext">Registered</p>
+              </div>
+            </div>
+            <div className="stat-card">
+              <div className="stat-icon">✅</div>
+              <div className="stat-content">
+                <h3>Delivered Today</h3>
+                <p className="stat-value">{kpis.deliveredToday}</p>
+                <p className="stat-subtext">vs today</p>
               </div>
             </div>
           </div>
 
-          {/* Recent Orders */}
-          <div className="orders-card">
-            <div className="card-header">
-              <h3>Recent Orders</h3>
-              <button className="btn-view-all">View All →</button>
-            </div>
-            <div className="orders-table">
-              <table>
-                <thead>
-                  <tr>
-                    <th>Order ID</th>
-                    <th>Customer</th>
-                    <th>Amount</th>
-                    <th>Status</th>
-                    <th>Time</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {recentOrders.map(order => (
-                    <tr key={order.id}>
-                      <td><strong>{order.id}</strong></td>
-                      <td>{order.customer}</td>
-                      <td>${order.amount}</td>
-                      <td>
-                        <span className={`status-badge ${order.status}`}>
-                          {order.status.replace('_', ' ')}
-                        </span>
-                      </td>
-                      <td>{order.time}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
+          {/* Grid */}
+          <div className="dashboard-grid">
+            <div className="left-column">
+              <div className="chart-card">
+                <div className="chart-header">
+                  <h3>Revenue Overview</h3>
+                </div>
+                <div className="chart-container">
+                  <RevenueChart data={kpis.revenueSeries} />
+                </div>
+              </div>
 
-        {/* Right Column */}
-        <div className="right-column">
-          {/* Active Drivers */}
-          <div className="drivers-card">
-            <div className="card-header">
-              <h3>Active Drivers</h3>
-              <button className="btn-refresh">🔄</button>
-            </div>
-            <div className="drivers-list">
-              {activeDrivers.map(driver => (
-                <div key={driver.id} className="driver-item">
-                  <div className="driver-avatar-small">
-                    <span>🚗</span>
-                  </div>
-                  <div className="driver-info">
-                    <div className="driver-name-status">
-                      <strong>{driver.name}</strong>
-                      <span className={`driver-status ${driver.status}`}>
-                        {driver.status.replace('_', ' ')}
-                      </span>
-                    </div>
-                    <div className="driver-details">
-                      <span className="location">📍 {driver.location}</span>
-                      {driver.order && (
-                        <span className="current-order">📦 {driver.order}</span>
-                      )}
-                    </div>
-                  </div>
-                  <div className="driver-actions">
-                    <button 
-                      className="btn-action"
-                      onClick={() => updateDriverStatus(driver.id, 'available')}
-                    >
-                      ✅
-                    </button>
-                    <button 
-                      className="btn-action"
-                      onClick={() => updateDriverStatus(driver.id, 'on_break')}
-                    >
-                      ☕
-                    </button>
+              {/* Orders Table */}
+              <div className="orders-card">
+                <div className="card-header">
+                  <h3>Orders</h3>
+                </div>
+                <div className="orders-table">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>Order ID</th>
+                        <th>Customer</th>
+                        <th>Amount</th>
+                        <th>Status</th>
+                        <th>Created</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {(ordersPage.orders || []).map((o) => (
+                        <tr key={o._id || o.id}>
+                          <td><strong>{o._id || o.id}</strong></td>
+                          <td>{o.userName || o.user?.name || '—'}</td>
+                          <td>{formatCurrency(o.totalAmount)}</td>
+                          <td><span className={`status-badge ${o.status}`}>{String(o.status || '').replace('_',' ')}</span></td>
+                          <td>{new Date(o.createdAt).toLocaleString()}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                <div className="table-footer">
+                  <div>Page {ordersPage.page} of {ordersPage.pages}</div>
+                  <div className="pager">
+                    <button onClick={() => changePage(ordersPage.page - 1)} disabled={ordersPage.page <= 1}>Prev</button>
+                    <button onClick={() => changePage(ordersPage.page + 1)} disabled={ordersPage.page >= ordersPage.pages}>Next</button>
+                    <select value={limit} onChange={(e) => { setLimit(Number(e.target.value)); setPage(1); }}>
+                      {[10,20,50].map(n => <option key={n} value={n}>{n}/page</option>)}
+                    </select>
                   </div>
                 </div>
-              ))}
+              </div>
             </div>
-          </div>
 
-          {/* Top Performers */}
-          <div className="top-performers">
-            <div className="card-header">
-              <h3>Top Drivers</h3>
-              <select className="time-select">
-                <option>This Month</option>
-                <option>This Week</option>
-                <option>All Time</option>
-              </select>
-            </div>
-            <div className="performers-list">
-              {topDrivers.map((driver, index) => (
-                <div key={driver.id} className="performer-item">
-                  <div className="performer-rank">{index + 1}</div>
-                  <div className="performer-avatar">
-                    <span>👤</span>
-                  </div>
-                  <div className="performer-info">
-                    <div className="performer-name">{driver.name}</div>
-                    <div className="performer-stats">
-                      <span className="stat">{driver.deliveries} deliveries</span>
-                      <span className="stat">⭐ {driver.rating}</span>
-                      <span className="stat earnings">${driver.earnings.toLocaleString()}</span>
+            <div className="right-column">
+              {/* Pending Issues and Today Revenue */}
+              <div className="top-performers">
+                <div className="card-header">
+                  <h3>Today Highlights</h3>
+                </div>
+                <div className="performers-list">
+                  <div className="performer-item">
+                    <div className="performer-rank">💵</div>
+                    <div className="performer-info">
+                      <div className="performer-name">Revenue Today</div>
+                      <div className="performer-stats"><span className="stat earnings">{formatCurrency(kpis.revenueToday)}</span></div>
                     </div>
                   </div>
-                  <button className="btn-view-profile">View</button>
+                  <div className="performer-item">
+                    <div className="performer-rank">⏳</div>
+                    <div className="performer-info">
+                      <div className="performer-name">Pending Issues</div>
+                      <div className="performer-stats"><span className="stat">{kpis.pendingIssues}</span></div>
+                    </div>
+                  </div>
                 </div>
-              ))}
+              </div>
+
+              {/* Quick Actions */}
+              <div className="admin-quick-actions">
+                <h3>Quick Actions</h3>
+                <div className="action-grid">
+                  <button className="admin-action-btn"><span className="action-icon">📊</span><span>Export</span></button>
+                  <button className="admin-action-btn"><span className="action-icon">🔄</span><span>Refresh</span></button>
+                  <button className="admin-action-btn"><span className="action-icon">⚙</span><span>Settings</span></button>
+                </div>
+              </div>
             </div>
           </div>
-
-          {/* Quick Actions */}
-          <div className="admin-quick-actions">
-            <h3>Quick Actions</h3>
-            <div className="action-grid">
-              <button className="admin-action-btn">
-                <span className="action-icon">➕</span>
-                <span>Add Driver</span>
-              </button>
-              <button className="admin-action-btn">
-                <span className="action-icon">🏪</span>
-                <span>Add Restaurant</span>
-              </button>
-              <button className="admin-action-btn">
-                <span className="action-icon">📊</span>
-                <span>Reports</span>
-              </button>
-              <button className="admin-action-btn">
-                <span className="action-icon">⚙</span>
-                <span>Settings</span>
-              </button>
-              <button className="admin-action-btn">
-                <span className="action-icon">📧</span>
-                <span>Broadcast</span>
-              </button>
-              <button className="admin-action-btn">
-                <span className="action-icon">🔄</span>
-                <span>Update Menu</span>
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Bottom Stats */}
-      <div className="bottom-stats">
-        <div className="stat-item">
-          <div className="stat-label">Today's Revenue</div>
-          <div className="stat-value">{stats.todayRevenue.toLocaleString()} Birr</div>
-        </div>
-        <div className="stat-item">
-          <div className="stat-label">Avg. Delivery Time</div>
-          <div className="stat-value">24 min</div>
-        </div>
-        <div className="stat-item">
-          <div className="stat-label">Customer Satisfaction</div>
-          <div className="stat-value">94.2%</div>
-        </div>
-        <div className="stat-item">
-          <div className="stat-label">Pending Issues</div>
-          <div className="stat-value warning">{stats.pendingIssues}</div>
-        </div>
-      </div>
+        </>
+      )}
     </div>
   );
 };

@@ -9,6 +9,7 @@ const CartSidebar = ({setIsSignInOpen,cartItems,isCartOpen,setIsCartOpen,t,setCa
     const [isProceedToCheck,setIsProceedToCheck] = useState(false);
     const [selectedPaymentMethod,setSelectedPaymentMethod] = useState('');
     const [receiptUrl,setReceiptUrl] = useState('');
+    const normalizedPaymentMethod = selectedPaymentMethod === 'mobileBanking' ? 'mobile' : selectedPaymentMethod;
     
   const handlePaymentmethod =(e) =>{
     setReceiptUrl('');
@@ -18,6 +19,7 @@ const CartSidebar = ({setIsSignInOpen,cartItems,isCartOpen,setIsCartOpen,t,setCa
        setSelectedPaymentMethod(newPaymentMethod);
         return setReceiptUrl('Cash On Delivery.')
       }
+      console.log(receiptUrl)
       setSelectedPaymentMethod(newPaymentMethod);
     }
 
@@ -40,7 +42,9 @@ const CartSidebar = ({setIsSignInOpen,cartItems,isCartOpen,setIsCartOpen,t,setCa
           ) : (
             <>
               {cartItems.map(item => (
-                <CartItem item={item}
+                <CartItem 
+                key={item.id || item._id || item.name}
+                item={item}
                 setCartItems={setCartItems}
                 />
               ))}
@@ -53,20 +57,36 @@ const CartSidebar = ({setIsSignInOpen,cartItems,isCartOpen,setIsCartOpen,t,setCa
              handlePaymentmethod={handlePaymentmethod}
              selectedPaymentMethod={selectedPaymentMethod}
              />
-              {selectedPaymentMethod === "mobileBanking" && 
-              <MobilePay receiptUrl={receiptUrl} 
-              setReceiptUrl={setReceiptUrl}
-              setIsSignInOpen={setIsSignInOpen} 
-              orders={orders}
-              setCartItems={setCartItems}
-              cartItems={cartItems}
-              cartTotal={cartTotal}
-              setOrders={setOrders}
-              selectedPaymentMethod={selectedPaymentMethod}
-              setSelectedPaymentMethod={setSelectedPaymentMethod}
-              />
-              }
-              {selectedPaymentMethod ==="cash" && <Checkout selectedPaymentMethod={selectedPaymentMethod} setCartItems={setCartItems} receiptUrl={receiptUrl} setReceiptUrl={setReceiptUrl} cartItems={cartItems} cartTotal={cartTotal} setOrders={setOrders} setSelectedPaymentMethod={setSelectedPaymentMethod}/> }
+              {selectedPaymentMethod === "mobileBanking" && (
+                <MobilePay
+                  receiptUrl={receiptUrl}
+                  setReceiptUrl={setReceiptUrl}
+                  setIsSignInOpen={setIsSignInOpen}
+                  orders={orders}
+                  setCartItems={setCartItems}
+                  cartItems={cartItems}
+                  cartTotal={cartTotal}
+                  setOrders={setOrders}
+                  selectedPaymentMethod={selectedPaymentMethod}
+                  setSelectedPaymentMethod ={setSelectedPaymentMethod}
+                />
+              )}
+
+              {/* Single Checkout render: cash immediately, mobile only after receipt */}
+              {(normalizedPaymentMethod === 'cash' || (normalizedPaymentMethod === 'mobile' && receiptUrl)) && (
+                <Checkout
+                  setIsSignInOpen={setIsSignInOpen}
+                  selectedPaymentMethod={normalizedPaymentMethod}
+                  setCartItems={setCartItems}
+                  receiptUrl={receiptUrl}
+                  setReceiptUrl={setReceiptUrl}
+                  cartItems={cartItems}
+                  cartTotal={cartTotal}
+                  setOrders={setOrders}
+                  setSelectedPaymentMethod={setSelectedPaymentMethod}
+                  handlePaymentmethod={handlePaymentmethod}
+                />
+              )}
 
               </div>}
               { !isProceedToCheck && <button 

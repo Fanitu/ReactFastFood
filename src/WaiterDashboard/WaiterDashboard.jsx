@@ -33,6 +33,15 @@ import { useOrders } from '../../ApiService/UseOrders'; // Custom hook for order
  * ORDER STATUS CONSTANTS & CONFIGURATION
  * ============================================================================
  * 
+ *  pending: 0,
+    confirmed: 0,
+    preparing: 0,
+    ready:0,
+    onTruck: 0,
+    delivered: 0,
+    cancelled: 0
+
+
  * Defines the complete order workflow lifecycle.
  * Each status has:
  * - Display name in multiple languages
@@ -45,7 +54,7 @@ const ORDER_STATUS_FLOW = [
   'confirmed',    // Order verified and accepted
   'preparing',    // Kitchen is preparing the order
   'ready',        // Order is ready for pickup/delivery
-  'out-for-delivery', // Order is with delivery personnel
+  'onTruck', // Order is with delivery personnel
   'delivered',    // Order successfully delivered to customer
   'cancelled'     // Order cancelled (terminal state)
 ];
@@ -114,7 +123,7 @@ const STATUS_CONFIG = {
       tigrigna: 'ኣዛዝታ ንምውሳድ/ምድራይ ድሉው እዩ'
     }
   },
-  'out-for-delivery': {
+  onTruck: {
     nextStatus: 'delivered',
     icon: '🚚',
     color: 'secondary',
@@ -738,7 +747,7 @@ const WaiterDashboard = () => {
           <div className="customer-info">
             <div className="customer-name">
               <span className="customer-icon">👤</span>
-              <strong>{order.name || 'Guest Customer'}</strong>
+              <strong>{order.userName || 'Guest Customer'}</strong>
             </div>
             <div className="customer-contact">
               <span className="contact-icon">📱</span>
@@ -890,8 +899,8 @@ const WaiterDashboard = () => {
       
       {/* Statistics Overview */}
       <section className="stats-overview">
-        {ORDER_STATUS_FLOW.map(status => (
-          <div 
+        {ORDER_STATUS_FLOW.map((status) => (
+          <div
             key={status}
             className={`stat-card ${activeTab === status ? 'active' : ''}`}
             onClick={() => handleTabChange(status)}
@@ -904,7 +913,7 @@ const WaiterDashboard = () => {
               <p className="stat-count">{stats[status] || 0}</p>
             </div>
             <div className="stat-description">
-              {STATUS_CONFIG[status]?.description[language]}
+              {STATUS_CONFIG[status]?.description?.[language]}
             </div>
           </div>
         ))}
