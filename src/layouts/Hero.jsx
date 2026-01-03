@@ -43,7 +43,6 @@ const Hero = ({currentSlide,t,setCurrentSlide}) => {
                   <h2>{slide.text}</h2>
                    <p>{t.watchFeedback}</p>
                    <button className="hero-btn order-now">{t.orderNow}</button>
-                 
                   </div>
               </div>
             </div>

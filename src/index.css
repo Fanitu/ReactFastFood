@@ -531,9 +531,9 @@ body {
 }
 
 .menu-item {
+  min-width: 300px;
   background: var(--card-bg);
   border-radius: 15px;
-  overflow: hidden;
   box-shadow: var(--shadow);
   transition: all 0.3s ease;
 }
@@ -619,7 +619,7 @@ body {
 .testimonial-content p {
   font-style: italic;
   margin-bottom: 1rem;
-  color: var(--text-dark);
+  color: black !important;
 }
 
 .testimonial-author {
@@ -3503,7 +3503,7 @@ body {
   }
   
   .header-content {
-    flex-direction: column;
+    flex-direction: row;
     gap: 1rem;
     text-align: center;
   }

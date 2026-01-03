@@ -2,7 +2,7 @@ import React from 'react'
 
 const Menu = ({products,activeCategory,t,setActiveCategory,addToCart}) => {
   return (
-   <section className="menu-section">
+   <section className="menu-section" id='menu'>
         <div className="container">
           <h2 className="section-title">{t.menu}</h2>
           <div className="menu-nav">
