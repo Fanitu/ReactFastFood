@@ -494,7 +494,7 @@ body {
 
 .section-title {
   text-align: center;
-  font-size: 2.5rem;
+  font-size: 2.5rem !important;
   margin-bottom: 3rem;
   color: var(--text-dark);
 }
