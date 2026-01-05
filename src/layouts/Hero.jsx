@@ -42,7 +42,7 @@ const Hero = ({currentSlide,t,setCurrentSlide}) => {
                 <div className="hero-content">
                   <h2>{slide.text}</h2>
                    <p>{t.watchFeedback}</p>
-                   <button className="hero-btn order-now">{t.orderNow}</button>
+                   <a href='#menu'><button className="hero-btn order-now">{t.orderNow}</button></a>
                   </div>
               </div>
             </div>

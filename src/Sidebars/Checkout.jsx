@@ -78,7 +78,8 @@ const Checkout = ({
       if (data?.address) {
         const address = data.address;
         const addressString = `${address.road || ''} ${address.house_number || ''}, ${address.postcode || ''} ${address.city || address.town || address.village || ''}`;
-        setUserEnteredAddressString(addressString.trim())
+        /* setUserEnteredAddressString(addressString.trim()
+      ) */
       }
     } catch (error) {
       if (error?.name === 'AbortError') return; // ignore aborts
@@ -151,10 +152,10 @@ const Checkout = ({
   const validateOrder = () => {
     const userId = user?.id || user?._id;
 
-    if (!addressDetails.room || !addressDetails.block) {
+    /* if (!addressDetails.room || !addressDetails.block) {
       setLocationError('Please provide either your location or enter a delivery address.');
       return false;
-    }
+    } */
 
     if (!selectedPaymentMethod) {
       setLocationError('Please select a payment method.');
@@ -267,13 +268,13 @@ const Checkout = ({
         setSelectedPaymentMethod('');
         setCartItems([]);
         setUserLocation(null);
-        setUserEnteredAddressString('');
+       /*  setUserEnteredAddressString('');
         setAddressDetails({
           street: '',
           city: '',
           postalCode: '',
           additionalInfo: ''
-        });
+        }); */
         setOrderMessage('');
       }, 4000);
 
@@ -337,7 +338,7 @@ const Checkout = ({
             </div>
           )}
         </div>
-
+{/* 
         <div className="manual-address-section">
           <label className="address-label">
             Or Enter Delivery Address:
@@ -369,7 +370,7 @@ const Checkout = ({
               disabled={isSubmitting}
             />
           </div>
-        </div>
+        </div> */}
       </div>
 
       {/* Payment Method Selection */}

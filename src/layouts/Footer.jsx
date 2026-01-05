@@ -12,9 +12,8 @@ const Footer = ({t}) => {
             <div className="footer-section">
               <h4>Quick Links</h4>
               <ul>
-                <li><a href="#home">Home</a></li>
+                <li><a href="#">Home</a></li>
                 <li><a href="#menu">Menu</a></li>
-                <li><a href="#about">About Us</a></li>
                 <li><a href="#contact">Contact</a></li>
               </ul>
             </div>
@@ -35,7 +34,7 @@ const Footer = ({t}) => {
             </div>
           </div>
           <div className="footer-bottom">
-            <p>&copy; 2024 YoYo Fast Food. All rights reserved.</p>
+            <p>&copy; 2026 YoYo Fast Food. All rights reserved.</p>
           </div>
         </div>
       </footer>

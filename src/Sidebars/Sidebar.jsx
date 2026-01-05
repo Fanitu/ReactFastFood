@@ -27,7 +27,7 @@ const Sidebar = ({isSidebarOpen,setIsSidebarOpen,darkMode,setDarkMode,t,topOrder
 
         <div className="location">
           <span className="location-icon">📍</span>
-          <span>{t.location}</span>
+          <span className="location-teller">{t.location}</span>
         </div>
 
         <div className="top-orders-section">

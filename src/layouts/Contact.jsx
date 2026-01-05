@@ -15,7 +15,7 @@ const Contact = ({t,setContactForm,contactForm}) => {
     setContactForm({ name: '', email: '', message: '' });
   };
   return (
-    <section className="contact-section">
+    <section className="contact-section" id='contact'>
         <div className="container">
           <h2 className="section-title">{t.weAreHere}</h2>
           <form className="contact-form" onSubmit={handleContactSubmit}>

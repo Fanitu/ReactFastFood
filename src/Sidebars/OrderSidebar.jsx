@@ -13,7 +13,7 @@ const OrderSidebar = ({isOrderOpen,setIsOrderOpen,orders}) => {
               </button>
         </div>
         <div className="order-items">
-          {!orders ? (
+          {!orders || [] ? (
             <p className="empty-cart">Your Orders is empty</p>
           ) : (
             <>
@@ -23,13 +23,11 @@ const OrderSidebar = ({isOrderOpen,setIsOrderOpen,orders}) => {
                     <h4>{order._id}</h4>
                   </div>
                   <strong>{order.totalAmount}</strong>
+                  <button className="checkout-btn">
+                    Delete Order
+                  </button>
                 </div>
               ))}
-              <div className="cart-total">
-              </div>
-              <button className="checkout-btn">
-                Delete Order
-              </button>
             </>
           )}
 

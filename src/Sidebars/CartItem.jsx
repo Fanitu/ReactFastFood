@@ -9,7 +9,7 @@ const CartItem = ({item,setCartItems}) => {
                   <img src={item.image} alt={item.name} />
                   <div className="cart-item-info">
                     <h4>{item.name}</h4>
-                    <p>${item.price} x {item.quantity}</p>
+                    <p className='price-cart-displayer'>{item.price} x {item.quantity} Birr</p>
                   </div>
                   <button 
                     className="remove-btn"
