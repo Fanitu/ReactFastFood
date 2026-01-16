@@ -10,7 +10,7 @@ const Testimonial = ({t,}) => {
               <div className="testimonial-content">
                 <p>"{t.testimonial1}"</p>
                 <div className="testimonial-author">
-                  <strong>- Alex Johnson</strong>
+                  <strong>- Getnet Abebe</strong>
                 </div>
               </div>
             </div>
@@ -18,7 +18,7 @@ const Testimonial = ({t,}) => {
               <div className="testimonial-content">
                 <p>"{t.testimonial2}"</p>
                 <div className="testimonial-author">
-                  <strong>- Sarah Michael</strong>
+                  <strong>- Sara Michael</strong>
                 </div>
               </div>
             </div>
@@ -26,7 +26,7 @@ const Testimonial = ({t,}) => {
               <div className="testimonial-content">
                 <p>"{t.testimonial3}"</p>
                 <div className="testimonial-author">
-                  <strong>- David Smith</strong>
+                  <strong>- Semere Zeray</strong>
                 </div>
               </div>
             </div>
@@ -34,7 +34,7 @@ const Testimonial = ({t,}) => {
               <div className="testimonial-content">
                 <p>"{t.testimonial4}"</p>
                 <div className="testimonial-author">
-                  <strong>- Emily Brown</strong>
+                  <strong>- Eiman Musa</strong>
                 </div>
               </div>
             </div>
